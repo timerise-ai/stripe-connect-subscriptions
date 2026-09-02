@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-09-02
+
+Wording release. Templates and technical content are unchanged from 0.1.6.
+
+### Changed
+- README and `SKILL.md` describe the module by the properties the templates hold and
+  what verifies them, in the frontmatter description, the intro, the critical facts,
+  the hard rules and the non-negotiables. The audit record stays in
+  `references/provenance.md`, linked from both.
+
 ## [0.1.6] - 2026-09-02
 
 Documentation-only release. The skill itself, `SKILL.md` and `references/`, is

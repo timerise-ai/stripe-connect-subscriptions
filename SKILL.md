@@ -14,10 +14,10 @@ description: >
   marketplace payouts, split payment, Express onboarding, account.updated,
   off_session, SetupIntent, dunning, subscription invoices, whsec_, "merchant never
   gets paid", "Funds can't be sent to accounts located in". Carries settlement
-  internals hardened against the defects the audit found: webhook idempotency,
-  single-flight claims, transfer retry with adoption, and the region rule that
-  silently strands payouts. Next.js App Router oriented; backend-agnostic. Not a
-  general checkout or PayPal skill.
+  internals the store's atomic claims and the money tests verify: webhook
+  idempotency, single-flight claims, transfer retry with adoption, and the region
+  rule that decides whether a connected account can be paid at all. Next.js App
+  Router oriented; backend-agnostic. Not a general checkout or PayPal skill.
 ---
 
 # Stripe Connect & Subscription Billing
@@ -71,13 +71,13 @@ platform ──off_session PaymentIntent (customer + saved PM)──▶ subscrip
    one `destination`; a multi-vendor cart needs N transfers under one
    `transfer_group`, so `application_fee_amount` is unusable.
 2. **A transfer without `source_transaction` draws on the *available* balance**
-   and is rejected while the charge is still settling — on a young platform
-   account, that is every transfer. This one flag is the difference between a
-   working split and a marketplace that has never paid anybody.
+   and is rejected while the charge is still settling; on a young platform
+   account, that is every transfer. This one flag is what lets a split fund
+   while the charge is still settling.
 3. **Stripe transfers cross-border only inside US/CA/UK/EEA/CH.** A platform
-   elsewhere pays connected accounts in its own country only — and it fails at
-   transfer time, not onboarding time, so everything looks healthy until the
-   money doesn't arrive.
+   elsewhere pays connected accounts in its own country only. Stripe enforces
+   this at transfer time, not onboarding time, so the templates apply the
+   region rule at onboarding.
 4. **Connect events carry a different signing secret** than platform events. Two
    endpoints, two secrets, one URL — verify against both.
 5. **A connected account's country is immutable** — wrong country means
@@ -88,20 +88,20 @@ platform ──off_session PaymentIntent (customer + saved PM)──▶ subscrip
 ## Hard rules
 
 > **Never let a failed transfer fail the settlement.** Record the leg unfunded
-> and continue. Letting it throw strands the paid order and 500s the webhook on
-> every retry, forever.
+> and continue. The charge has already succeeded, so the webhook must succeed
+> too; the retry cron funds the leg later.
 
 > **Never treat a duplicate webhook insert as "already handled".** The insert is
-> a *claim*; if the previous delivery crashed mid-handling, the retry must re-run
-> the handlers or the event is dropped permanently.
+> a *claim*; the retry after a delivery crashed mid-handling re-runs the
+> handlers, so every event runs to completion exactly once.
 
 > **Never re-send a transfer without asking Stripe whether it already exists.** A
 > leg recorded unfunded because the *response* was lost pays twice once Stripe's
 > 24h idempotency window passes.
 
 > **Never derive settlement exclusivity from a status flag written at the end.**
-> Two callers reach settlement routinely; use an atomic leased claim, or you
-> consume inventory twice.
+> Two callers reach settlement routinely; an atomic leased claim is what makes
+> inventory and transfers happen once.
 
 > **Never reverse more than a transfer's remaining headroom.** Stacked reversals
 > (gateway fee, then a refund) are rejected past the original amount.
@@ -116,8 +116,8 @@ platform ──off_session PaymentIntent (customer + saved PM)──▶ subscrip
 6. Converge: retry legs, reconcile fees — [reconciliation.md](references/reconciliation.md).
 7. Bill tenants — [subscriptions.md](references/subscriptions.md); run it with [operations.md](references/operations.md).
 
-Fit it to your app with [adaptation.md](references/adaptation.md); deviations from
-the earlier implementation are in [provenance.md](references/provenance.md).
+Fit it to your app with [adaptation.md](references/adaptation.md); the record of
+the audit is in [provenance.md](references/provenance.md).
 
 ## Adaptation Contract
 
@@ -148,4 +148,4 @@ the earlier implementation are in [provenance.md](references/provenance.md).
 | Recurring platform fees | SetupIntent, off_session, saved card, dunning, invoice, past_due, suspend | [subscriptions.md](references/subscriptions.md) |
 | Setup, env, crons, debugging | STRIPE_SECRET_KEY, webhook endpoint, stripe listen, cron, "merchant never paid" | [operations.md](references/operations.md) |
 | Fitting it to this app | adapt, host probe, rename, ORM, auth guard, port | [adaptation.md](references/adaptation.md) |
-| What changed from source | provenance, defect, deviation, fixed, added | [provenance.md](references/provenance.md) |
+| The audit record | provenance, deviation, kept, added, unverified | [provenance.md](references/provenance.md) |

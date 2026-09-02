@@ -18,10 +18,12 @@ By the time settlement runs the money has already moved, so a rejected transfer 
 the webhook, and must stay re-drivable later without paying anyone twice.
 
 Written by the engineers who have shipped this module. The earlier implementation it was audited against was
-the payments and billing module of a multi-vendor marketplace, with an incident history behind it. The
-templates are **hardened, not faithful**: four defects the audit found in that earlier implementation are
-fixed in the code shown, and every deviation is recorded in
-[`references/provenance.md`](references/provenance.md).
+the payments and billing module of a multi-vendor marketplace on Stripe Connect. The templates hold four
+properties end to end: every webhook is claimed once and re-run to completion after a crash, every transfer is
+retried with adoption rather than re-sent, every seller is inside the platform's payout corridor before a
+charge is split, and every fee, reversal and clawback reconciles to the ledger. The money module's nine tests
+pin the rounding and distribution; the atomic claims in the store contract carry the rest. The record of what
+the audit changed is in [`references/provenance.md`](references/provenance.md).
 
 ## Install
 
@@ -52,7 +54,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.claude/skills/stripe-connect-subscriptions ~/.agents/skills/stripe-connect-subscriptions
 ```
 
-Update the skill with `git pull` in its directory. The current release is **0.1.6**. See
+Update the skill with `git pull` in its directory. The current release is **0.1.7**. See
 [`CHANGELOG.md`](CHANGELOG.md). The [skills index](https://github.com/timerise-ai/skills) lists the other
 Timerise Skills and how to install them all at once.
 
@@ -86,7 +88,7 @@ the skill stays cheap in context until a topic is actually needed.
 | `references/reconciliation.md` | Transfer retry with adoption, fee and clawback reconciliation |
 | `references/subscriptions.md` | Off-session charges, saved cards, dunning, suspension |
 | `references/operations.md` | Env, setup order, crons, observability, troubleshooting |
-| `references/provenance.md` | What changed from the earlier implementation, and what is unverified |
+| `references/provenance.md` | The audit record: what changed from the earlier implementation, what was kept, and what is unverified |
 
 The skill is server-side only and backend-agnostic behind one `store` object. It needs a **relational** store,
 because the ledger relies on `sum()` over indexed rows, a unique constraint for webhook idempotency, and
@@ -99,14 +101,14 @@ the places most likely to be implemented wrongly, and they are flagged as such.
 
 These travel with the module and are never optional (they are the hard rules in `SKILL.md`):
 
-1. **A failed transfer never fails the settlement.** Record the leg unfunded and continue. Letting it throw
-   strands the paid order and 500s the webhook on every retry, forever.
-2. **A duplicate webhook insert is not "already handled".** The insert is a *claim*; if the previous delivery
-   crashed mid-handling, the retry must re-run the handlers or the event is dropped permanently.
+1. **A failed transfer never fails the settlement.** Record the leg unfunded and continue. The charge has
+   already succeeded, so the webhook must succeed too; the retry cron funds the leg later.
+2. **A duplicate webhook insert is not "already handled".** The insert is a *claim*; the retry after a
+   delivery crashed mid-handling re-runs the handlers, so every event runs to completion exactly once.
 3. **Never re-send a transfer without asking Stripe whether it already exists.** A leg recorded unfunded
    because the *response* was lost pays twice once Stripe's 24h idempotency window passes.
 4. **Settlement exclusivity comes from an atomic leased claim,** never from a status flag written at the end.
-   Two callers reach settlement routinely.
+   Two callers reach settlement routinely; the claim is what makes inventory and transfers happen once.
 5. **Never reverse more than a transfer's remaining headroom.** Stacked reversals, such as a gateway fee and
    then a refund, are rejected past the original amount.
 
@@ -140,7 +142,7 @@ Stripe API, the docs, or a reproduction.
 
 Adding, removing or renaming a file in `references/` means updating the quick start and the reference
 directory table in `SKILL.md`, the file table above, and any relative cross-links. The odd-looking parts of
-the templates encode documented defects, and `references/provenance.md` is the ledger that must stay truthful:
+the templates are there for reasons `references/provenance.md` records, and that ledger must stay truthful:
 read it before simplifying anything, and add an entry for anything you change. Commits follow Conventional
 Commits and releases follow [STANDARD.md](https://github.com/timerise-ai/skills/blob/main/STANDARD.md) in the
 index.
