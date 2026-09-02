@@ -1,11 +1,10 @@
 # Provenance
 
 Written by the engineers who have shipped this module. The earlier
-implementation it was audited against was a multi-vendor marketplace running
-Stripe Connect (separate charges and transfers) plus platform subscription
-billing on one Stripe account: ~40 source files across payments and
-subscriptions, with unit tests, an operations runbook, and roughly a year of
-incident history behind the comments.
+implementation it was audited against was the payments and billing module of a
+multi-vendor marketplace running Stripe Connect (separate charges and
+transfers) plus platform subscription billing on one Stripe account, with unit
+tests, an operations runbook, and an incident history behind the comments.
 
 The templates here are **hardened, not faithful**. Defects found during the audit
 are fixed in the code you see, and every deviation is recorded below. Where a

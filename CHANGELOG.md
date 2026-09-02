@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-09-02
+
+Documentation-only release. The skill itself, `SKILL.md` and `references/`, is
+unchanged from 0.1.5.
+
+### Changed
+- `README.md` and `references/provenance.md`: the size figures of the earlier
+  implementation (its file count and the span of its incident history) are gone,
+  replaced by the shape of the module: the payments and billing module of a
+  multi-vendor marketplace with an incident history behind it. Design parameters and
+  the skill's own test count stay.
+
 ## [0.1.5] - 2026-09-02
 
 Wording release. The origin and audit statements across the skill follow section 2 of

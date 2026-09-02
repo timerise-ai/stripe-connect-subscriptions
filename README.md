@@ -18,9 +18,10 @@ By the time settlement runs the money has already moved, so a rejected transfer 
 the webhook, and must stay re-drivable later without paying anyone twice.
 
 Written by the engineers who have shipped this module. The earlier implementation it was audited against was
-a multi-vendor marketplace with roughly a year of incident history behind it. The templates are **hardened,
-not faithful**: four defects the audit found in that earlier implementation are fixed in the code shown, and
-every deviation is recorded in [`references/provenance.md`](references/provenance.md).
+the payments and billing module of a multi-vendor marketplace, with an incident history behind it. The
+templates are **hardened, not faithful**: four defects the audit found in that earlier implementation are
+fixed in the code shown, and every deviation is recorded in
+[`references/provenance.md`](references/provenance.md).
 
 ## Install
 
@@ -51,7 +52,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.claude/skills/stripe-connect-subscriptions ~/.agents/skills/stripe-connect-subscriptions
 ```
 
-Update the skill with `git pull` in its directory. The current release is **0.1.5**. See
+Update the skill with `git pull` in its directory. The current release is **0.1.6**. See
 [`CHANGELOG.md`](CHANGELOG.md). The [skills index](https://github.com/timerise-ai/skills) lists the other
 Timerise Skills and how to install them all at once.
 
