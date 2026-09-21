@@ -149,3 +149,5 @@ the audit is in [provenance.md](references/provenance.md).
 | Setup, env, crons, debugging | STRIPE_SECRET_KEY, webhook endpoint, stripe listen, cron, "merchant never paid" | [operations.md](references/operations.md) |
 | Fitting it to this app | adapt, host probe, rename, ORM, auth guard, port | [adaptation.md](references/adaptation.md) |
 | The audit record | provenance, deviation, kept, added, unverified | [provenance.md](references/provenance.md) |
+
+Part of the [Timerise Skills](https://github.com/timerise-ai/skills) index, which lists the sibling skills.
