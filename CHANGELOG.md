@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-09-29
+
+Fix release, from scoring the prompt-1 agent eval runs against 0.1.9.
+
+### Fixed
+- Connected accounts are set to manual payouts during onboarding (`connect-accounts.md`). On Stripe's
+  automatic schedule the connected balance was paid out to the seller's bank before the escrow hold
+  released, and the payout gate never ran. Apps built from earlier versions should add the
+  `balanceSettings.update` call to their onboarding and run it once for every existing connected account.
+- `distribute` ranks remainders by magnitude (`money.md`). A negative total handed the leftover grain to the
+  smallest share, so a prorated reversal did not mirror the positive split. Apps built from earlier
+  versions should copy the new sort; the money module now has ten tests.
+
+### Changed
+- The quick start in `SKILL.md` says to copy the templates and `money.test.ts` verbatim, names `stripe`,
+  `vitest` and `pg` as the module's dependencies, maps a payout hold to the escrow window, and lists what to
+  hand over to the operator. `adaptation.md`, `settlement.md` and `data-model.md` say the same in place.
+- `STRIPE_COUNTRIES` ships as the platform's own country instead of a placeholder.
+- `operations.md` lists `CRON_SECRET` with the other env variables and says what `.env.example` holds.
+- `provenance.md` records both fixes under *Added*.
+
 ## [0.1.9] - 2026-09-29
 
 Brings the repository to the current skill standard. The money model, the templates' logic and the

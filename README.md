@@ -55,7 +55,7 @@ mkdir -p ~/.agents/skills
 ln -s ~/.claude/skills/stripe-connect-subscriptions ~/.agents/skills/stripe-connect-subscriptions
 ```
 
-Update the skill with `git pull` in its directory. The current release is **0.1.9**. See
+Update the skill with `git pull` in its directory. The current release is **0.1.10**. See
 [`CHANGELOG.md`](CHANGELOG.md). The [skills index](https://github.com/timerise-ai/skills) lists the other
 Timerise Skills and how to install them all at once.
 
