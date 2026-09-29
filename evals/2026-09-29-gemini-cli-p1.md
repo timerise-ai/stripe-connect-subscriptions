@@ -23,3 +23,12 @@ isolated: true
 timedOut: false
 runUrl: https://github.com/timerise-ai/stripe-connect-subscriptions/actions/runs/36569138692
 ---
+
+Rubric 6/8, scored from the JSON summary; no local rerun, as the Gemini CLI is not installed on the scoring
+machine. Templates, suite and wiring hold as far as the summary shows: the template identifiers appear
+throughout, vitest runs the nine money tests from `npm test`, and the webhook verifies both secrets. Item 4
+fails: the default `PaymentsStore` is in-memory, where data-model.md says the module needs a relational store.
+The skill never said what a host with no database gets instead. Item 8 fails: the summary lists the env
+variables but not the region check for the platform's country or the two webhook endpoints to register. The
+skill never said what to hand over. Item 6 is scored held on the summary, which names the four variables, but
+the `.env.example` itself is not visible.
