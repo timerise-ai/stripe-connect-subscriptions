@@ -19,7 +19,7 @@ invoices and charges them with plain PaymentIntents. The trade-off:
 | Plan tied to app entitlements | Two sources of truth to keep in sync | One |
 | Changing a plan | API call + a webhook to sync | A code deploy |
 
-**Choose this shape when the plan drives in-app entitlements** — feature caps,
+**Choose this shape when the plan drives in-app entitlements**: feature caps,
 commission rates, category limits. Keeping the catalog in code means a plan change
 ships with the deploy instead of requiring someone to run SQL or click in the
 dashboard against each environment. If your plans are purely "how much do they
@@ -32,9 +32,10 @@ pay", use Stripe Subscriptions and skip this file.
 ## The billing instrument
 
 Card entry happens only in Stripe-hosted elements. Persist the PaymentMethod id
-plus brand and last4 — **never the PAN**. That is the whole PCI SAQ-A posture.
+plus brand and last4, **never the PAN**. That is the whole PCI SAQ-A posture.
 
 ```ts
+// lib/payments/subscriptions.ts
 /** Get-or-create the seller's platform Stripe Customer. Distinct from their
  *  connected account: this Customer is charged BY the platform. */
 export async function ensureBillingCustomer(tenantId: string): Promise<string> {
@@ -57,7 +58,7 @@ export async function createBillingSetupIntent(
   const customerId = await ensureBillingCustomer(tenantId);
   const intent = await stripeClient().setupIntents.create({
     customer: customerId,
-    // Required for later off-session charges — without it the card may demand
+    // Required for later off-session charges; without it the card may demand
     // authentication at charge time and every renewal fails.
     usage: "off_session",
     payment_method_types: ["card"],
@@ -68,7 +69,7 @@ export async function createBillingSetupIntent(
 
 /**
  * Persist a confirmed SetupIntent's payment method. Verifies the intent
- * succeeded AND belongs to this tenant's own Customer — without that second
+ * succeeded AND belongs to this tenant's own Customer. Without that second
  * check a client could bind a PaymentMethod set up for someone else.
  */
 export async function confirmBillingPaymentMethod(
@@ -110,7 +111,7 @@ export async function confirmBillingPaymentMethod(
 }
 ```
 
-Removal detaches at Stripe **best-effort** and always clears the columns — a
+Removal detaches at Stripe **best-effort** and always clears the columns. A
 detach that fails must not leave a card the seller cannot remove:
 
 ```ts
@@ -120,7 +121,7 @@ await store.clearBillingPaymentMethod(tenantId);
 
 ## Issuing invoices
 
-Idempotent per `(tenant, period)` — and enforce that with a **unique index**, not
+Idempotent per `(tenant, period)`, and enforce that with a **unique index**, not
 just the code check. A concurrent or re-triggered cron pass then hits a
 constraint violation instead of double-issuing.
 
@@ -152,7 +153,7 @@ export async function issueDueInvoices(): Promise<{ tenants: number; issued: num
       status: "open",
       dueAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     });
-    if (!row) continue; // unique violation — another pass issued it
+    if (!row) continue; // unique violation: another pass issued it
     issued++;
     await notify("subscription.invoice_issued", t.id, { amount, periodStart, periodEnd });
   }
@@ -172,7 +173,7 @@ month gets billed again:
 
 ```ts
 export async function applyDueSubscriptionCancellations(): Promise<{ cancelled: number }> {
-  // active tenants whose subscription_cancel_at has arrived → cancelled
+  // active tenants whose subscription_cancel_at has arrived become cancelled
   return store.cancelDueSubscriptions(new Date().toISOString());
 }
 ```
@@ -212,8 +213,8 @@ export async function chargeInvoice(
         payment_method: tenant.billingPaymentMethodId,
         off_session: true,
         confirm: true,
-        description: `Subscription ${invoice.planCode} (${invoice.periodStart} → ${invoice.periodEnd})`,
-        // `purpose` is what the webhook dispatcher routes on — without it, a
+        description: `Subscription ${invoice.planCode} (${invoice.periodStart} to ${invoice.periodEnd})`,
+        // `purpose` is what the webhook dispatcher routes on; without it, a
         // platform charge would be mistaken for an order payment and settled.
         metadata: {
           purpose: "subscription_invoice",
@@ -239,7 +240,7 @@ export async function chargeInvoice(
   } catch (err) {
     if (err instanceof HttpError) throw err;
     // A declined off-session charge surfaces as a Stripe error carrying the
-    // created (failed) PaymentIntent. A NETWORK error does not — see below.
+    // created (failed) PaymentIntent. A NETWORK error does not; see below.
     const stripeErr = err as { message?: string; payment_intent?: { id?: string } };
     return await applyChargeFailure(
       invoice,
@@ -255,16 +256,16 @@ export async function chargeInvoice(
 ## Dunning
 
 Explicit and testable: retry every 3 days, suspend on the third failure, and let
-any success — including a manual retry past the cap — settle and reactivate.
+any success, including a manual retry past the cap, settle and reactivate.
 
 ```
-open ──charge fails──▶ open (attempts+1, next_charge_at = +3d)
-                          │  … at attempts == 3
-                          ▼
+open --charge fails--> open (attempts+1, next_charge_at = +3d)
+                          |  ... at attempts == 3
+                          v
                       past_due  +  tenant.subscription_status = 'past_due'
-                          │
+                          |
                     manual "Pay now" succeeds
-                          ▼
+                          v
                         paid    +  tenant reactivated to 'active'
 ```
 
@@ -354,7 +355,7 @@ export async function chargeDueInvoices(): Promise<{
 }
 ```
 
-`past_due` invoices are deliberately **not** re-swept — the attempt cap is the
+`past_due` invoices are deliberately **not** re-swept: the attempt cap is the
 policy, and the manual "Pay now" is the way out. Say so in the seller's UI, or
 they will wait for a retry that never comes.
 
@@ -392,7 +393,7 @@ export async function applySubscriptionChargeOutcome(
   // Failure dedupe. Match on the intent id when we have it; ALSO treat a
   // recorded failure with no intent id as already-applied when the error text
   // matches. The synchronous path only learns the intent id when the SDK error
-  // carries one — a network error or timeout does not, so keying on the id
+  // carries one; a network error or timeout does not, so keying on the id
   // alone lets the webhook record a SECOND failure for the same charge, burning
   // two of the three dunning attempts and suspending the seller a cycle early.
   const alreadyRecorded =
@@ -420,6 +421,7 @@ export async function applySubscriptionChargeOutcome(
 ## Tests worth keeping
 
 ```ts
+// lib/payments/subscriptions.test.ts
 it("does not double-count a failure the sync path recorded without an intent id", async () => {
   // The network-error case: attempts already 1, no intent id on the row.
   state.invoice = { chargeAttempts: 1, paymentIntentId: null, lastChargeError: "timeout" };
@@ -439,7 +441,7 @@ it("reactivates a past_due tenant when a manual retry succeeds", async () => {
 it("never resurrects a cancelled tenant into dunning", async () => {
   state.tenant.subscriptionStatus = "cancelled";
   state.invoice = { chargeAttempts: 2 };
-  await chargeInvoice(state.invoice.id); // fails → third attempt
+  await chargeInvoice(state.invoice.id); // fails: third attempt
   expect(state.tenant.subscriptionStatus).toBe("cancelled");
 });
 ```

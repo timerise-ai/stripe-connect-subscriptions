@@ -19,7 +19,7 @@ export function stripeClient(): Stripe {
   if (!key) throw new Error("stripe_misconfigured: STRIPE_SECRET_KEY is not set");
   cached = new Stripe(key, {
     // Pin the API version explicitly. Left unset, the SDK uses the version its
-    // own release pins to — so bumping the `stripe` package silently changes
+    // own release pins to, so bumping the `stripe` package silently changes
     // request and response shapes. Pin it, and an SDK upgrade is a deliberate
     // migration instead of a surprise in production.
     //
@@ -35,7 +35,7 @@ export function stripeClient(): Stripe {
   return cached;
 }
 
-/** Test hook only — reset the memoized client between fixtures. */
+/** Test hook only: reset the memoized client between fixtures. */
 export function _resetStripeClientCache(): void {
   cached = null;
 }
@@ -54,8 +54,8 @@ configured secret and accept the first that verifies.
 ```ts
 export function constructWebhookEvent(rawBody: string, signature: string): Stripe.Event {
   const secrets = [
-    process.env.STRIPE_WEBHOOK_SECRET,          // endpoint A — platform events
-    process.env.STRIPE_CONNECT_WEBHOOK_SECRET,  // endpoint B — account.updated
+    process.env.STRIPE_WEBHOOK_SECRET,          // endpoint A: platform events
+    process.env.STRIPE_CONNECT_WEBHOOK_SECRET,  // endpoint B: account.updated
   ].filter((s): s is string => Boolean(s));
   if (secrets.length === 0) {
     throw new Error("stripe_misconfigured: no webhook signing secret is set");
@@ -77,7 +77,7 @@ export function constructWebhookEvent(rawBody: string, signature: string): Strip
 }
 ```
 
-Because both are tried, swapping the two env vars still works — but two *wrong*
+Because both are tried, swapping the two env vars still works, but two *wrong*
 secrets fail every delivery with an identical `401`, which is indistinguishable
 from a tampered payload. [operations.md](operations.md) has the triage.
 
@@ -127,7 +127,7 @@ export type CreateTransferInput = {
   /**
    * The charge this transfer is carved out of. Without it the transfer is drawn
    * from the platform's AVAILABLE balance and is rejected while the charge is
-   * still settling — which is every transfer on a young platform account, whose
+   * still settling, which is every transfer on a young platform account, whose
    * whole balance sits in `pending` for the settlement delay. With it, Stripe
    * accepts the transfer regardless of available balance and the money lands
    * when the charge settles.
@@ -238,7 +238,7 @@ export class StripeProvider implements CombinedProvider {
 
   /**
    * Stripe accepts a cancel in every pre-capture state including
-   * `requires_action`, and **rejects it once the intent has succeeded** — so a
+   * `requires_action`, and **rejects it once the intent has succeeded**, so a
    * throw here is the unpaid-order sweep's signal that the buyer finished the
    * 3DS challenge first and the order must be settled, not cancelled.
    */
@@ -249,7 +249,7 @@ export class StripeProvider implements CombinedProvider {
   /**
    * The processing fee, read off the charge's balance transaction. Denominated
    * in the PLATFORM account's settlement currency, which is not necessarily the
-   * order's — the caller must compare before recording (see reconciliation.md).
+   * order's; the caller must compare before recording (see reconciliation.md).
    * Null while the balance transaction does not exist yet.
    */
   async retrieveChargeFee(
@@ -290,7 +290,7 @@ export class StripeProvider implements CombinedProvider {
    * Transfers are listable by `transfer_group`, and settlement stamps
    * `vendorOrderId` + `kind` into each leg's metadata, so the match is exact.
    * One page suffices: a group holds one transfer per seller sub-order plus
-   * partner legs. If your carts can exceed 100 legs, paginate — silently
+   * partner legs. If your carts can exceed 100 legs, paginate: silently
    * missing an existing transfer here means paying it twice.
    */
   async findTransferInGroup(ref: TransferLegRef): Promise<{ externalId: string } | null> {
@@ -332,7 +332,7 @@ export class StripeProvider implements CombinedProvider {
     return { externalId: reversal.id, raw: reversal };
   }
 
-  /** Connected-account payout — note `stripeAccount`, not a body field. */
+  /** Connected-account payout: note `stripeAccount`, not a body field. */
   async createPayout(input: CreatePayoutInput): Promise<ProviderPayout> {
     const payout = await this.stripe.payouts.create(
       {
@@ -356,7 +356,7 @@ export class StripeProvider implements CombinedProvider {
 ## Status mapping
 
 Collapse Stripe's states into the module's five. The mapping is deliberately
-lossy in one place and precise in another — both matter.
+lossy in one place and precise in another, and both matter.
 
 ```ts
 function mapIntent(intent: Stripe.PaymentIntent): ProviderIntent {
@@ -366,7 +366,7 @@ function mapIntent(intent: Stripe.PaymentIntent): ProviderIntent {
     status: mapIntentStatus(intent.status),
     // Set ONLY on Stripe's own `requires_action`. An intent that was never
     // confirmed (`requires_payment_method`) maps to the same status but carries
-    // no action state — so "the buyer is mid-3DS" stays distinguishable from
+    // no action state, so "the buyer is mid-3DS" stays distinguishable from
     // "the buyer never started", which decides whether the order may be
     // cancelled. Collapsing these strands or over-cancels orders.
     requiresActionState: intent.status === "requires_action" ? "3ds" : null,
@@ -423,7 +423,7 @@ function stripeRefundReason(reason?: string): Stripe.RefundCreateParams.Reason |
 
 ## Idempotency keys
 
-Derive them from stable domain ids — never from a timestamp or a random value,
+Derive them from stable domain ids, never from a timestamp or a random value,
 which defeats the point on the retry that matters.
 
 | Operation | Key | Note |

@@ -19,10 +19,10 @@ drift becomes an unreversible transfer.
 ## The module
 
 Complete and self-contained. `ES2017` target, so `BigInt(0)` rather than the `0n`
-literal — drop the wrappers if you target ES2020+.
+literal. Drop the wrappers if you target ES2020+.
 
 ```ts
-// lib/money.ts
+// lib/payments/money.ts
 const SCALE = 4;
 const SCALE_FACTOR = BigInt(10000); // 10 ** SCALE
 const B0 = BigInt(0);
@@ -119,7 +119,7 @@ export function mulRate(amount: string, rate: string | number): string {
   return fromUnits(negative ? -rounded : rounded);
 }
 
-/** Major-unit string → provider minor units. Rejects sub-cent precision. */
+/** Major-unit string to provider minor units. Rejects sub-cent precision. */
 export function toMinorUnits(amount: string, fractionDigits = 2): number {
   const units = toUnits(amount);
   const divisor = SCALE_FACTOR / BigInt(10) ** BigInt(fractionDigits);
@@ -136,7 +136,7 @@ export function fromMinorUnits(minor: number, fractionDigits = 2): string {
 
 /**
  * Quantize to the currency's minor unit. Every rate-derived ledger leg must pass
- * through this at the point it is created — `toMinorUnits` throws later
+ * through this at the point it is created: `toMinorUnits` throws later
  * otherwise, deep inside a transfer, where the failure is expensive.
  * `down` truncates toward zero, for figures that must never round up (a payout
  * must not exceed the balance that justified it).
@@ -171,7 +171,7 @@ export function assertSameCurrency(a: Money, b: Money): void {
 }
 ```
 
-## `distribute` — the one everyone gets wrong
+## `distribute`, the one everyone gets wrong
 
 Splitting one amount across N weights must sum back to **exactly** the original.
 Naive per-part rounding leaks a cent, and that cent later makes a reversal exceed
@@ -243,6 +243,7 @@ partial refund across transfers, splitting shipping and tax across line items.
 These encode the properties the module claims. Port them with the code.
 
 ```ts
+// lib/payments/money.test.ts
 import { describe, expect, it } from "vitest";
 import { distribute, mulRate, roundToMinorUnits, sum, toMinorUnits } from "./money";
 

@@ -13,8 +13,8 @@ ls middleware.ts proxy.ts 2>/dev/null           # Next 16 uses proxy.ts
 cat CLAUDE.md AGENTS.md 2>/dev/null | head -60  # the house rules, already decided
 ```
 
-Then read **two existing route handlers end to end** — ideally ones that mutate
-data — and write down the house pattern: the exact auth call, the error shape,
+Then read **two existing route handlers end to end**, ideally ones that mutate
+data, and write down the house pattern: the exact auth call, the error shape,
 how the DB client is obtained, whether bodies are validated and with what.
 
 `CLAUDE.md` / `AGENTS.md` outrank anything in this skill.
@@ -33,7 +33,7 @@ The skill's vocabulary and the most likely host equivalents:
 | `PaymentIntent` row | Your record of the charge | Payment, Charge, Transaction |
 
 Confirm the rename **with the user before generating**, then apply it everywhere
-at once — types, columns, route paths, variables, comments, strings. A half-done
+at once: types, columns, route paths, variables, comments, strings. A half-done
 rename teaches the next reader that both names are live.
 
 **Do not rename** genuine Stripe/technical terms: `transfer_group`,
@@ -42,6 +42,17 @@ rename teaches the next reader that both names are live.
 renaming them breaks every search against Stripe's docs.
 
 ## Seam by seam
+
+| Seam | The skill ships | The host supplies |
+|---|---|---|
+| Domain entities | `Tenant` (seller org), `Order`, `VendorOrder`, `Partner` | Its own vocabulary |
+| Tenant scope | One server-derived `tenantId` | org / workspace / seller |
+| Auth guard | An adapter signature per route | Clerk, NextAuth, Supabase, custom |
+| Data access | A [`PaymentsStore`](store.md) contract + SQL | Its ORM or SDK |
+| Audit + notifications | Call sites, event names, payload shapes | Its audit table / outbox |
+| Background work | Four crons and their cadence | Its scheduler |
+| Validation | A schema shape per route body | zod / valibot / yup |
+| UI | Nothing, this skill is server-side | All of it |
 
 ### Auth guard
 
@@ -61,7 +72,7 @@ guard; detail routes are where it goes missing.
 
 ### Data access
 
-The skill talks to a `store` object. Implement it in the host's existing style —
+The skill talks to a `store` object. Implement it in the host's existing style:
 if the host uses Drizzle with a repository layer, this module gets Drizzle with a
 repository layer, even where the skill shows raw SQL. **Never mix data-access
 styles inside one codebase.**
@@ -71,10 +82,10 @@ Three operations must keep their exact semantics, whatever the ORM:
 | Operation | Non-negotiable property |
 |---|---|
 | `claimSettlement` | A single atomic conditional update returning whether *this* caller won |
-| `claimFeeAllocation` | Same — `pending → allocated` must be a race-free claim |
+| `claimFeeAllocation` | Same: the move from `pending` to `allocated` must be a race-free claim |
 | `claimTransferRetry` | Same, and it must also write the next backoff time |
 
-If your ORM cannot express "update … where status = 'pending' returning id" as
+If your ORM cannot express "update ... where status = 'pending' returning id" as
 one statement, drop to raw SQL for these three. A read-then-write is not
 equivalent and will double-pay under load.
 
@@ -82,7 +93,7 @@ equivalent and will double-pay under load.
 
 `recordAudit({ action, tenantId, payload, requestId, actorUserId })` and
 `notify(type, tenantId, payload)` are call sites, not implementations. Map to the
-host's audit table and outbox, or stub them — but keep the call sites. They are
+host's audit table and outbox, or stub them, but keep the call sites. They are
 what makes "who changed this, and when" answerable, and re-adding them later means
 touching every path again.
 
@@ -106,25 +117,25 @@ module's inputs decide where money goes.
 
 If the host already stores money, **do not introduce a second representation.**
 Adapt the money module's scale to theirs (integer minor units is the common
-alternative — keep the same functions, change `SCALE` to 0 and drop the
+alternative: keep the same functions, change `SCALE` to 0 and drop the
 `toMinorUnits` divisor). Two money types in one codebase is the worst outcome.
 
 ### Background work
 
 Four crons, cadences in [operations.md](operations.md). Map to the host's
 scheduler. If it has none, the sweeps can run opportunistically from a read path
-(rate-limited) — say so explicitly rather than shipping jobs that never fire.
+(rate-limited); say so explicitly rather than shipping jobs that never fire.
 
 ## Order of work
 
 Inward-out; type-check after each layer. Fixing a rename at step 1 is one edit; at
 step 6 it is thirty.
 
-1. **Money** — pure, no dependencies, tests pass immediately.
-2. **Types + schema/migration** — with the rename applied.
-3. **Store** — the host's ORM, its file layout, its naming.
-4. **Adapter** — client, provider interface, Stripe implementation.
-5. **Webhook route** — the host's error shape and logging.
+1. **Money**: pure, no dependencies, tests pass immediately.
+2. **Types + schema/migration**, with the rename applied.
+3. **Store**: the host's ORM, its file layout, its naming.
+4. **Adapter**: client, provider interface, Stripe implementation.
+5. **Webhook route**: the host's error shape and logging.
 6. **Settlement, then reconciliation, then subscriptions.**
 7. **Crons and the admin surfaces.**
 
@@ -134,7 +145,7 @@ Do not port these unless the host actually needs them:
 
 - The partner/commission split, if there are only sellers and a platform.
 - Rolling reserves, if you pay out immediately.
-- The KYC-gated payout hold, if your compliance model differs — but keep *some*
+- The KYC-gated payout hold, if your compliance model differs, but keep *some*
   gate between escrow release and payout, or a fraudulent seller cashes out.
 - The escrow window itself, if sellers are paid on capture. Note that removing it
   removes your only lever for refunds after payout.

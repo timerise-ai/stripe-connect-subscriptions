@@ -17,13 +17,13 @@ claim could not be verified, it says so.
 The earlier implementation built its crash-resume skip set from **all**
 transfer rows for the intent, keyed on `vendorOrderId` regardless of
 `destinationKind`. A vendor order
-can write two rows — the partner split first, then the seller's own leg. If
+can write two rows: the partner split first, then the seller's own leg. If
 settlement crashed in the window between them, the resumed run saw a transfer for
 that vendor order and skipped it entirely: no seller transfer, no escrow hold, no
 reserve, and the sub-order left `pending` forever.
 
 Nothing recovers it. The retry sweep only re-drives *unfunded seller legs*, and no
-such row was ever written — so the money stays on the platform balance with
+such row was ever written, so the money stays on the platform balance with
 nothing pointing at it, and the seller's order queue shows a paid order stuck
 pending.
 
@@ -31,7 +31,7 @@ Narrow window, permanent consequence, and invisible to every test that does not
 inject a crash at exactly that point.
 
 **Shipped:** two separate resume sets, `settledSellerIds` and
-`settledPartnerIds`, filtered by `destinationKind` —
+`settledPartnerIds`, filtered by `destinationKind`, in
 [settlement.md](settlement.md).
 
 ### 2. One declined charge can burn two dunning attempts
@@ -47,18 +47,18 @@ Consequence: a seller is suspended after two real failures instead of three, and
 the dunning email fires early.
 
 **Shipped:** the dedupe also treats a recorded failure with a null intent id as
-already-applied, and adopts the id so later deliveries dedupe on the fast path —
+already-applied, and adopts the id so later deliveries dedupe on the fast path, in
 [subscriptions.md](subscriptions.md). A regression test is included.
 
 ### 3. The Stripe client pinned no API version
 
 `new Stripe(key, { appInfo })` with no `apiVersion` falls back to the version the
-installed SDK pins to. Deterministic per lockfile, so nothing is broken today —
+installed SDK pins to. Deterministic per lockfile, so nothing is broken today,
 but bumping the `stripe` package silently changes request and response shapes
 across every call site in the module, including money-carrying ones.
 
 **Shipped:** an explicit `apiVersion` and `maxNetworkRetries`, with a comment
-explaining why the pin exists so nobody removes it —
+explaining why the pin exists so nobody removes it, in
 [stripe-adapter.md](stripe-adapter.md).
 
 ### 4. Unbounded sweeps
@@ -69,7 +69,7 @@ exceeds the function timeout mid-run; the next run picks up, so it self-heals, a
 therefore nobody notices the sweep never completes.
 
 **Shipped:** an explicit page limit, and the rule that a bounded sweep must log
-what it left behind — [reconciliation.md](reconciliation.md),
+what it left behind, in [reconciliation.md](reconciliation.md),
 [subscriptions.md](subscriptions.md).
 
 ## Kept deliberately
@@ -78,7 +78,7 @@ These look wrong and are not. Do not "fix" them.
 
 - **A rejected transfer does not throw.** It records an unfunded leg and continues.
   Letting it propagate stranded paid orders on `pending` and made the webhook 500
-  on every retry forever — the common cause (a wrong-region connected account) is
+  on every retry forever, and the common cause (a wrong-region connected account) is
   not fixed by retrying.
 - **The webhook-events insert is a claim, not a receipt.** A duplicate insert
   re-reads the row and re-runs the handlers if `processed_at` is null. Treating
@@ -130,15 +130,15 @@ Stated plainly rather than implied:
   module: check the current API reference before shipping onboarding.
 - **The `apiVersion` string** in the adapter is the one `stripe@22` pins to, and
   it type-checks against that SDK. A different SDK major will reject it at compile
-  time — which is the intended behaviour, not a bug.
+  time, which is the intended behaviour, not a bug.
 - The TypeScript templates were assembled into a scratch project against the real
   `stripe` types and compile clean under `strict` **and**
   `--noUncheckedIndexedAccess`. The `store` calls are checked against the
   interface in [store.md](store.md), not against any real implementation, and the
   host seams (auth, audit, logger, HTTP) are declared stubs.
 - The money module's behavioural tests were **run and pass** (9 tests). Two of
-  them initially encoded wrong expectations about `mulRate` — it rounds at the
-  4-dp internal scale, not at the minor unit — which is exactly the confusion the
+  them initially encoded wrong expectations about `mulRate` (it rounds at the
+  4-dp internal scale, not at the minor unit), which is exactly the confusion the
   corrected tests now pin down. Nothing else in the skill has executable tests.
 
 ## Provenance of the onboarding code
@@ -160,7 +160,7 @@ that before you write a line.
 
 Fix order, most damaging first:
 
-1. The crash-resume skip set (§1) — silent, permanent, unrecoverable.
-2. The dunning double-count (§2) — suspends paying customers early.
-3. Pin the API version (§3) — before the next SDK bump, not after.
-4. Bound the sweeps (§4).
+1. The crash-resume skip set (section 1): silent, permanent, unrecoverable.
+2. The dunning double-count (section 2): suspends paying customers early.
+3. Pin the API version (section 3): before the next SDK bump, not after.
+4. Bound the sweeps (section 4).

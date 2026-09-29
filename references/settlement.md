@@ -16,7 +16,7 @@ moved.
 
 ## Single-flight: why a status check is not enough
 
-Two callers reach settlement for the same order **routinely** — the webhook and
+Two callers reach settlement for the same order **routinely**: the webhook and
 the read-path sync fire within milliseconds of each other. The obvious guard
 ("is the intent already `succeeded`?") cannot stop them: that flag is written at
 the *end* of the fan-out, seconds of Stripe latency later, so both callers pass
@@ -27,6 +27,7 @@ Keep the status check as a cheap fast path, but make the real exclusion an
 atomic leased claim.
 
 ```ts
+// lib/payments/settlement.ts
 export async function settleOrder(
   orderId: string,
   requestId?: string,
@@ -37,7 +38,7 @@ export async function settleOrder(
   // Cheap short-circuit for an obvious duplicate; the claim rejects this too.
   if (intent.status === "succeeded") return { settled: false, transfers: 0 };
 
-  // Losing the claim is NOT an error — it means someone else is settling. Return
+  // Losing the claim is NOT an error; it means someone else is settling. Return
   // the same shape as "already settled", which every caller already reads as
   // "don't cancel, don't retry now".
   if (!(await store.claimSettlement(intent.id))) {
@@ -49,21 +50,21 @@ export async function settleOrder(
     return await runSettlement({ orderId, intent, requestId });
   } catch (err) {
     // Hand the lease back so the provider's retry resumes at once rather than
-    // waiting it out. Best-effort — lease expiry is the backstop.
+    // waiting it out. Best-effort: lease expiry is the backstop.
     await store.releaseSettlementClaim(intent.id).catch(() => undefined);
     throw err;
   }
 }
 ```
 
-A **failed claim RPC counts as "not claimed"**. Skipping a settlement is safe —
+A **failed claim RPC counts as "not claimed"**. Skipping a settlement is safe:
 the webhook and the read-path sync both retry. Proceeding without the claim is
 not.
 
 ## Per-leg resume, done right
 
 Settlement is not transactional, so a crash mid-fan-out must resume. The naive
-resume marker — "does this order have any transfer yet?" — strands every seller
+resume marker ("does this order have any transfer yet?") strands every seller
 after the one that committed before the crash.
 
 The subtler trap, and the one worth stating loudly:
@@ -73,7 +74,7 @@ The subtler trap, and the one worth stating loudly:
 A vendor order can produce two rows: a partner-split leg, written first, then the
 seller's own leg. If the set is keyed on `vendorOrderId` regardless of
 `destinationKind`, a crash in the window between those two writes makes the
-resume skip the whole vendor order — the seller is never paid, no escrow hold is
+resume skip the whole vendor order: the seller is never paid, no escrow hold is
 created, and their sub-order stays `pending` forever. The retry sweep cannot
 rescue it either, because no unfunded seller leg exists to re-drive.
 
@@ -99,7 +100,7 @@ async function runSettlement(ctx: {
 
   // Fund every transfer from the buyer's charge, not the platform's available
   // balance. Best-effort: a failed lookup degrades to available-balance
-  // behaviour rather than blocking settlement — and a leg rejected that way is
+  // behaviour rather than blocking settlement, and a leg rejected that way is
   // picked up by the retry sweep.
   const sourceTransactionId = await resolveTransferSource(intent.externalId, orderId);
 
@@ -109,8 +110,8 @@ async function runSettlement(ctx: {
     const destination = await store.sellerAccountId(vo.tenantId);
     if (!destination) {
       // Seller has not finished onboarding. Record the whole pool as an unfunded
-      // claim against them — including any partner cut, since nothing can route
-      // until they onboard — and let the retry sweep fund it later.
+      // claim against them, including any partner cut, since nothing can route
+      // until they onboard, and let the retry sweep fund it later.
       if (!settledSellerIds.has(vo.id)) {
         const held = vo.membershipId ? add(sellerAmount, vo.partnerCommissionAmount) : sellerAmount;
         await store.insertTransfer({
@@ -157,7 +158,7 @@ async function runSettlement(ctx: {
         });
         transfersCreated++;
       } else {
-        // No payable partner account → the cut folds back into the seller. This
+        // No payable partner account, so the cut folds back into the seller. This
         // is a ROUTING decision, not a failure: a partner leg the provider
         // *rejected* stays owed to the partner and must never fold.
         sellerAmount = add(sellerAmount, vo.partnerCommissionAmount);
@@ -213,9 +214,9 @@ async function runSettlement(ctx: {
 
 Two calls at the end of `runSettlement` are **host hooks**, not part of this
 module: `reconcileFeeAfterSettlement` (see
-[reconciliation.md](reconciliation.md) — it fetches the charge fee and calls
+[reconciliation.md](reconciliation.md): it fetches the charge fee and calls
 `reconcileGatewayFee`, best-effort, because settlement must never fail on a fee
-fetch) and `finalizeOrderItems` (consume inventory, confirm reservations — your
+fetch) and `finalizeOrderItems` (consume inventory, confirm reservations: your
 domain, not payments). Both must be best-effort and idempotent: settlement can be
 re-entered.
 
@@ -253,7 +254,7 @@ async function attemptTransfer(
 **Why it cannot propagate.** The buyer's money is already captured, so paying the
 seller cannot be a precondition for recognising the order as paid. Letting the
 rejection propagate stranded orders on `pending` and made the webhook 500 on every
-retry — forever, because the common cause (a connected account outside the
+retry, forever, because the common cause (a connected account outside the
 platform's region) is not fixed by retrying. The order still reaches `paid`; the
 unfunded leg is visible to admins with the provider's own reason in `lastError`,
 audited, and re-driven by the retry sweep.
@@ -263,13 +264,13 @@ audited, and re-driven by the retry sweep.
 ```ts
 /**
  * Stripe's `source_transaction`. Without it the provider draws on the platform's
- * AVAILABLE balance and rejects the transfer while the charge is still settling
- * — which on a young platform account is every transfer: the whole balance sits
+ * AVAILABLE balance and rejects the transfer while the charge is still settling,
+ * which on a young platform account is every transfer: the whole balance sits
  * in `pending` for the settlement delay, so the fan-out never funds anything and
  * the split is invisible on the connected account.
  *
  * Never throws. Money already moved on the buyer's side, so a charge lookup
- * failing must not abort the fan-out — it degrades to the available-balance
+ * failing must not abort the fan-out; it degrades to the available-balance
  * behaviour, and a leg rejected that way is picked up by the retry sweep.
  */
 export async function resolveTransferSource(
@@ -350,12 +351,12 @@ async function accrueReserve(
 
 Reversals **stack** on one transfer: the gateway-fee clawback at settlement, then
 a refund of the same order later. Stripe rejects a reversal that would push
-cumulative reversals past the original transfer amount — and that rejection
+cumulative reversals past the original transfer amount, and that rejection
 fails the whole refund.
 
 ```ts
 /**
- * How much of a transfer can still be reversed. Clamped at zero — never
+ * How much of a transfer can still be reversed. Clamped at zero, never
  * negative. Money the seller never received (the retained gateway fee) cannot be
  * clawed back a second time on refund; carry that shortfall as a signed
  * `adjustments` row instead.
@@ -387,7 +388,7 @@ export async function computePayableBalance(
     store.sumPayouts(tenantId, currency, ["scheduled", "in_transit", "paid"]),
     store.sumReversalsForTenant(tenantId, currency),
   ]);
-  // released − reserves − reversals + adjustments − scheduled
+  // released - reserves - reversals + adjustments - scheduled
   return sub(sub(add(sub(released, reserves), adjustments), reversals), scheduled);
 }
 ```

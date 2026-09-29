@@ -10,14 +10,14 @@ through.**
 The obvious implementation is wrong in a way that loses events permanently:
 
 ```ts
-// WRONG — drops every event whose first delivery crashed mid-handling.
+// WRONG: drops every event whose first delivery crashed mid-handling.
 if (await alreadySeen(event.id)) return ok();
 await markSeen(event.id);
 await handle(event);
 ```
 
 If the handler throws after the row was written, Stripe retries, the row exists,
-and the retry is swallowed as a duplicate. The event is never handled — silently,
+and the retry is swallowed as a duplicate. The event is never handled, silently and
 forever.
 
 The fix: the row records *claimed* and *processed* separately, and a duplicate
@@ -35,7 +35,7 @@ export async function recordWebhookEvent(input: {
   if (inserted.ok) return { duplicate: false, id: inserted.id };
   if (inserted.conflict) {
     const existing = await store.getWebhookEvent(input.provider, input.externalEventId);
-    // Delivered before — but the earlier delivery never finished. The provider's
+    // Delivered before, but the earlier delivery never finished. The provider's
     // retry must re-run the (idempotent) handlers, or the event is lost.
     if (existing && existing.processedAt === null) {
       return { duplicate: false, id: existing.id };
@@ -47,7 +47,7 @@ export async function recordWebhookEvent(input: {
 
 /**
  * Flip the processed marker once the handlers finished. Keyed on the NATURAL
- * key — the route holds Stripe's event id, not the row uuid. Passing a provider
+ * key: the route holds Stripe's event id, not the row uuid. Passing a provider
  * id to an `id` filter matches nothing and leaves `processed_at` null forever,
  * which quietly re-runs every replay.
  */
@@ -92,7 +92,7 @@ export const POST = route(async (req, { requestId }) => {
   } catch (err) {
     // Log explicitly. A typed-error-to-JSON mapper usually does NOT log, so
     // without this a misconfigured signing secret leaves no trace on your side
-    // at all — only Stripe's dashboard shows the failures, and you debug blind.
+    // at all; only Stripe's dashboard shows the failures, and you debug blind.
     logger.warn({ err: String(err), requestId }, "stripe.webhook.rejected");
     throw err;
   }
@@ -170,7 +170,7 @@ async function dispatchPaymentEvent(event: Stripe.Event, requestId: string): Pro
   switch (event.type) {
     case "payment_intent.succeeded": {
       const pi = event.data.object as Stripe.PaymentIntent;
-      // A platform charge, not an order payment — settle the invoice and stop.
+      // A platform charge, not an order payment: settle the invoice and stop.
       if (pi.metadata?.purpose === "subscription_invoice") {
         await applySubscriptionChargeOutcome(pi, requestId);
         return;
@@ -178,7 +178,7 @@ async function dispatchPaymentEvent(event: Stripe.Event, requestId: string): Pro
       const resolved = await store.intentByExternalId(pi.id);
       if (!resolved) {
         // Not ours (another integration on the same account, or a stale test
-        // event). Warn and ACK — never throw, or Stripe retries for days.
+        // event). Warn and ACK; never throw, or Stripe retries for days.
         logger.warn({ externalIntentId: pi.id }, "webhook.intent_not_found");
         return;
       }
@@ -197,7 +197,7 @@ async function dispatchPaymentEvent(event: Stripe.Event, requestId: string): Pro
     }
 
     case "charge.succeeded": {
-      // Backstop only for the gateway fee — settlement fetches it itself. See
+      // Backstop only for the gateway fee; settlement fetches it itself. See
       // reconciliation.md for why an early arrival must defer.
       const charge = event.data.object as Stripe.Charge;
       const fee = await resolveChargeFee(charge);
@@ -259,6 +259,7 @@ order detail call this; it is safe because `settleOrder` short-circuits once the
 intent is locally `succeeded`.
 
 ```ts
+// lib/payments/sync.ts
 export type PaymentSyncResult =
   | { settled: true }
   | {
@@ -279,7 +280,7 @@ export async function syncOrderPaymentFromProvider(
   const intent = await store.intentByOrder(orderId);
   if (!intent?.externalId) return { settled: false, reason: "no_intent" };
   // If the order still reads `pending` here, settlement crashed between the
-  // intent flip and the order update — charged, so never safe to cancel.
+  // intent flip and the order update: charged, so never safe to cancel.
   if (intent.status === "succeeded") return { settled: false, reason: "settled_locally" };
 
   try {
@@ -289,7 +290,7 @@ export async function syncOrderPaymentFromProvider(
       // cancel here would release stock against money very likely to land.
       if (remote.status === "processing") return { settled: false, reason: "processing" };
       // Only Stripe's own `requires_action` sets this, so an intent that was
-      // never confirmed does NOT land here — see the adapter's mapIntent.
+      // never confirmed does NOT land here; see the adapter's mapIntent.
       if (remote.requiresActionState) return { settled: false, reason: "awaiting_action" };
       return { settled: false, reason: "not_succeeded" };
     }
@@ -304,15 +305,15 @@ export async function syncOrderPaymentFromProvider(
 
 **Only `no_intent` and `not_succeeded` authorise cancelling the order.** Every
 other reason means the buyer may have been, or is about to be, charged. Getting
-this table wrong cancels paid orders — this is the single most consequential
+this table wrong cancels paid orders: this is the single most consequential
 enum in the module.
 
 ## Events to register
 
 | Endpoint | Events | Secret |
 |---|---|---|
-| **A — platform account** | `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.succeeded`, `charge.dispute.created`, `charge.dispute.closed`, `payment_method.detached`, `payment_method.automatically_updated` | `STRIPE_WEBHOOK_SECRET` |
-| **B — connected accounts** | `account.updated` | `STRIPE_CONNECT_WEBHOOK_SECRET` |
+| **A: platform account** | `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.succeeded`, `charge.dispute.created`, `charge.dispute.closed`, `payment_method.detached`, `payment_method.automatically_updated` | `STRIPE_WEBHOOK_SECRET` |
+| **B: connected accounts** | `account.updated` | `STRIPE_CONNECT_WEBHOOK_SECRET` |
 
 Same URL, two endpoint registrations, two secrets. Anything else is ACKed and
 ignored, so extra subscriptions only waste deliveries.

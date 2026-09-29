@@ -3,7 +3,7 @@
 Every module in this skill talks to one object called `store`. This file is that
 object's contract and the reference SQL behind its three non-obvious methods.
 
-The interface exists so the settlement engine is testable against a fake — **not**
+The interface exists so the settlement engine is testable against a fake, **not**
 to abstract away your ORM. In a host app, implement it in that app's own idiom
 (see [adaptation.md](adaptation.md)); do not introduce a repository layer the rest
 of the codebase does not have.
@@ -21,6 +21,7 @@ double-pay under load. If your ORM cannot express them in one statement, drop to
 raw SQL for those three.
 
 ```ts
+// lib/payments/store.ts
 export interface PaymentsStore {
   // --- intents -------------------------------------------------------------
   intentById(id: string): Promise<PaymentIntentRow | null>;
@@ -79,7 +80,7 @@ export interface PaymentsStore {
     membershipId: string,
     provider: ProviderName,
   ): Promise<PartnerAccountRow | null>;
-  /** Null when no partner account matches — the caller then tries the tenant. */
+  /** Null when no partner account matches; the caller then tries the tenant. */
   applyPartnerAccountUpdate(
     externalAccountId: string,
     chargesEnabled: boolean,
@@ -106,7 +107,7 @@ export interface PaymentsStore {
   activeTenants(): Promise<ActiveTenant[]>;
   listPlans(): Promise<Map<string, PlanRow>>;
   getInvoice(id: string): Promise<SubscriptionInvoiceRow | null>;
-  /** Null on a unique violation — another pass issued this period. */
+  /** Null on a unique violation: another pass issued this period. */
   insertInvoice(i: NewInvoice): Promise<{ id: string } | null>;
   updateInvoice(id: string, patch: Partial<SubscriptionInvoiceRow>): Promise<void>;
   latestInvoicePeriodEnd(tenantId: string): Promise<string | null>;
@@ -116,7 +117,7 @@ export interface PaymentsStore {
   cancelDueSubscriptions(nowIso: string): Promise<{ cancelled: number }>;
 }
 
-/** Distinguishes a unique-constraint conflict from a genuine failure — the
+/** Distinguishes a unique-constraint conflict from a genuine failure: the
  *  webhook claim depends on telling them apart. */
 export type InsertWebhookResult =
   | { ok: true; conflict?: false; id: string; error?: undefined }
@@ -256,6 +257,7 @@ export type NewInvoice = {
 ### The three atomic claims, in SQL
 
 ```sql
+-- lib/payments/store.sql: the queries behind the raw-SQL PaymentsStore
 -- claimTransferRetry: the claim IS the backoff (see reconciliation.md).
 update transfers
    set retry_attempts = $2, retry_next_attempt_at = $3
@@ -273,6 +275,6 @@ update vendor_orders
 returning id;
 ```
 
-`claimSettlement` is the `fn_claim_settlement` function below — it needs the
+`claimSettlement` is the `fn_claim_settlement` function below: it needs the
 lease arithmetic, so it stays a function rather than an inline statement.
 

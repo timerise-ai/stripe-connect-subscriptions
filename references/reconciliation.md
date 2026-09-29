@@ -10,7 +10,7 @@ never doubles anything.
 
 `attemptTransfer` degrades a rejected transfer to an unfunded row so the buyer's
 paid order is never held hostage. Without a sweep, nothing ever re-attempts those
-legs — which is a split payment whose seller half silently never lands: the charge
+legs, which is a split payment whose seller half silently never lands: the charge
 succeeds, the transfer group is stamped on it, and the connected account shows
 nothing.
 
@@ -24,7 +24,8 @@ Most rejections are **fixable, not permanent**:
 - an account/region misconfiguration corrected at the account level.
 
 ```ts
-/** Rows per run. Each costs 2–4 provider round-trips — size to your timeout. */
+// lib/payments/reconciliation.ts
+/** Rows per run. Each costs 2 to 4 provider round-trips; size to your timeout. */
 const SWEEP_ROW_LIMIT = 100;
 /** 10 min doubling per attempt, capped at 24h. */
 const RETRY_BASE_MS = 10 * 60_000;
@@ -52,7 +53,7 @@ export async function retryUnfundedTransfers(requestId?: string): Promise<Transf
 ### The claim *is* the backoff
 
 One conditional update does three jobs: it excludes concurrent runners, it
-schedules the next attempt, and it survives a crash mid-provider-call — the leg
+schedules the next attempt, and it survives a crash mid-provider-call: the leg
 is simply left correctly scheduled rather than pinned as claimed forever.
 
 ```ts
@@ -77,7 +78,7 @@ async function retryLeg(
     return "deferred";
   }
 
-  // Re-read the destination EVERY pass — the whole point of the retry is that a
+  // Re-read the destination EVERY pass: the whole point of the retry is that a
   // seller or partner may have onboarded since the order settled.
   const destination = await resolveDestination(leg);
   if (!destination) {
@@ -88,7 +89,7 @@ async function retryLeg(
   // Money may ALREADY have moved: attemptTransfer records a leg unfunded on any
   // throw, including a timeout raised after the provider committed. The
   // idempotency key covers a re-send inside Stripe's 24h window; beyond it, this
-  // lookup is the only guard against paying twice. Best-effort — a failed lookup
+  // lookup is the only guard against paying twice. Best-effort: a failed lookup
   // falls through to the key rather than blocking the repair.
   const existing = await findExistingTransfer(intent.orderId, leg);
   if (existing) {
@@ -106,7 +107,7 @@ async function retryLeg(
       destinationAccountId: destination,
       transferGroup: intent.orderId,
       sourceTransactionId,
-      // The SETTLEMENT key, deliberately — inside Stripe's window a re-send
+      // The SETTLEMENT key, deliberately: inside Stripe's window a re-send
       // resolves to the original transfer instead of creating a second one.
       idempotencyKey: leg.vendorOrderId
         ? `transfer:${leg.destinationKind}:${leg.vendorOrderId}`
@@ -128,7 +129,7 @@ async function retryLeg(
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     // The backoff was already applied by the claim; this only carries the reason
-    // forward. Truncate — provider messages can be long.
+    // forward. Truncate: provider messages can be long.
     await store.recordTransferFailure(leg.id, detail.slice(0, 500));
     logger.warn({ transferId: leg.id, err: detail }, "transfer_retry.failed");
     return "deferred";
@@ -163,7 +164,7 @@ seller bears it. So the fee must be **recorded** against each seller sub-order a
 **clawed back** out of what the seller received.
 
 Clawing back means a real `transfer_reversals` row against the funded seller
-transfer. If no funded transfer exists, degrade to a signed `adjustments` debit —
+transfer. If no funded transfer exists, degrade to a signed `adjustments` debit,
 but note the difference: an adjustment reduces the *recorded* payable balance
 while the cash stays in the seller's Stripe balance, so their Stripe payout will
 exceed your recorded net. Prefer the reversal, which is why timing matters below.
@@ -173,24 +174,24 @@ exceed your recorded net. Prefer the reversal, which is why timing matters below
 Durable, not one-shot. Each seller sub-order carries its own status.
 
 ```
-pending ──(fee known, share claimed)──▶ allocated ──(clawback done)──▶ recorded
-   │                                                                     ▲
-   └──(fee/order currency mismatch)──▶ manual_review    allocated rows ───┘
+pending --(fee known, share claimed)--> allocated --(clawback done)--> recorded
+   |                                                                     ^
+   +--(fee/order currency mismatch)--> manual_review    allocated rows ---+
                                                         whose clawback failed
 ```
 
 | Transition | Mechanism | Why |
 |---|---|---|
-| `pending → allocated` | Atomic conditional update | Settlement, webhook and sweep race routinely; only one may claim a row |
+| `pending` to `allocated` | Atomic conditional update | Settlement, webhook and sweep race routinely; only one may claim a row |
 | Share persisted **before** money moves | Write, then reverse | A crash leaves a resumable `allocated`, not a lost fee |
-| `allocated → recorded` | After the clawback | Convergent: re-derives what is still owed from the ledger, so a resume never double-debits |
-| `→ manual_review` | Currency mismatch | The sweep stops retrying a case that can never succeed on its own |
+| `allocated` to `recorded` | After the clawback | Convergent: re-derives what is still owed from the ledger, so a resume never double-debits |
+| To `manual_review` | Currency mismatch | The sweep stops retrying a case that can never succeed on its own |
 
 ### Ordering: why an early `charge.succeeded` must defer
 
 `charge.succeeded` usually outruns settlement. If the fee is reconciled then,
 there is no funded seller transfer yet, so the clawback can only degrade to a
-ledger-only adjustment — leaving the fee cash in the seller's Stripe balance and
+ledger-only adjustment, leaving the fee cash in the seller's Stripe balance and
 making their Stripe payout exceed the recorded net.
 
 So: **settlement is the primary writer** (it fetches the fee itself, right after
@@ -232,7 +233,7 @@ export async function reconcileGatewayFee(
     return;
   }
 
-  // Deterministic: same fee, same weights → same split, so a partially
+  // Deterministic: same fee and weights give the same split, so a partially
   // reconciled order re-derives identical shares for rows still pending.
   const portions = distribute(
     feeAmount,
@@ -251,13 +252,13 @@ export async function reconcileGatewayFee(
     } else {
       portion = portions[i] as string;
       if (isZero(portion)) {
-        // A genuinely zero share is still a reconciliation RESULT — record it,
+        // A genuinely zero share is still a reconciliation RESULT: record it,
         // or the dashboard reads "pending settlement" forever and the sweep
         // revisits the row on every pass.
         await store.setFeeStatus(v.id, "recorded");
         continue;
       }
-      // Atomic claim. Only the update that flips pending → allocated proceeds.
+      // Atomic claim. Only the update that flips pending to allocated proceeds.
       const claimed = await store.claimFeeAllocation(v.id, portion);
       if (!claimed) continue;
     }
@@ -275,7 +276,7 @@ async function clawBackFee(row: FeeRow, portion: string): Promise<void> {
   const transfer = await store.fundedSellerTransfer(row.id);
 
   if (transfer?.externalId) {
-    // Cap at the headroom — a later refund also reverses this transfer, and
+    // Cap at the headroom: a later refund also reverses this transfer, and
     // Stripe rejects cumulative reversals past the original amount.
     const headroom = await reversibleHeadroom(transfer.id, transfer.amount);
     const amount = min(portion, headroom);
@@ -314,7 +315,7 @@ async function clawBackFee(row: FeeRow, portion: string): Promise<void> {
 | Sweep | Cadence | Fixes |
 |---|---|---|
 | `retry-transfers` | every 20 min | Legs the provider rejected |
-| `sweep-gateway-fees` | hourly | Rows stuck `pending`/`allocated` — a missing `charge.succeeded` registration, a transient error |
+| `sweep-gateway-fees` | hourly | Rows stuck `pending`/`allocated`: a missing `charge.succeeded` registration, a transient error |
 | `release-escrow` | hourly | Holds whose `release_at` has passed |
 | `reconcile-orphan-payments` | hourly | Charges with no settled order |
 

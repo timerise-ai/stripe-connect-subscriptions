@@ -8,8 +8,8 @@ half that decides whether the integration survives contact with real sellers.
 ```bash
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...   # pk_live_... in production
 STRIPE_SECRET_KEY=sk_test_...                    # sk_live_... in production
-STRIPE_WEBHOOK_SECRET=whsec_...                  # endpoint A — platform events
-STRIPE_CONNECT_WEBHOOK_SECRET=whsec_...          # endpoint B — account.updated
+STRIPE_WEBHOOK_SECRET=whsec_...                  # endpoint A: platform events
+STRIPE_CONNECT_WEBHOOK_SECRET=whsec_...          # endpoint B: account.updated
 ```
 
 Test and live keys are different. Crossing them fails in ways that read like code
@@ -19,11 +19,11 @@ test key cannot see live accounts at all.
 ## Setup, in order
 
 1. **Check the region rule first.** Before anything else, confirm your platform's
-   country can transfer to the countries your sellers will be in — see
+   country can transfer to the countries your sellers will be in. See
    [connect-accounts.md](connect-accounts.md). Everything else can be fixed later;
    this one cannot.
 2. **Enable Connect** in the dashboard and complete the platform profile.
-3. **Keys** — Developers → API keys, per mode.
+3. **Keys**: Developers, then API keys, per mode.
 4. **Register two webhook endpoints** at the same URL, with the event sets in
    [webhooks.md](webhooks.md). Two registrations, two secrets.
 5. **Set the env vars** per environment.
@@ -36,25 +36,25 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 stripe listen --listen-to-connect --forward-to localhost:3000/api/webhooks/stripe
 ```
 
-Each prints its own `whsec_…`. A single listener forwarding both streams may share
-one secret locally — which is why local success does not prove the two-secret
+Each prints its own `whsec_...`. A single listener forwarding both streams may share
+one secret locally, which is why local success does not prove the two-secret
 setup is right in a deployed environment.
 
 ## Verification
 
-1. **Signature path.** Endpoint page → *Send test event*, or
+1. **Signature path.** *Send test event* on the endpoint page, or
    `stripe trigger payment_intent.succeeded`. Expect `200`, and a row in
    `webhook_events` keyed `(stripe, event.id)`. A replay returns `200` with
    `Idempotent-Replay: true`. A tampered signature returns `401`.
-2. **Region path — before any end-to-end test.** Confirm
+2. **Region path, before any end-to-end test.** Confirm
    `country_specs/<platform country>.supported_transfer_countries` contains the
    country you are about to onboard the test seller in. If it does not, checkout
-   will still charge the card and the order will still reach `paid` — **and the
+   will still charge the card and the order will still reach `paid`, **and the
    seller will not be funded**. Do not treat that run as green.
 3. **End to end.** Onboard a seller in a supported country, run a card checkout
    with a Stripe test card. On `payment_intent.succeeded` expect the order `paid`,
    one transfer row per seller sub-order, and escrow holds fanned out.
-4. **Log trace.** `stripe.webhook.received` → `stripe.webhook.processed`. A
+4. **Log trace.** `stripe.webhook.received`, then `stripe.webhook.processed`. A
    `received` with no `processed` means the fan-out threw; read the error beside
    it.
 5. **Repeat in live mode.**
@@ -77,7 +77,7 @@ by hand:
 https://<deployment>/api/cron/retry-transfers?key=$CRON_SECRET
 ```
 
-Return the summary in the response body (`{ funded, deferred, skipped }`) — it is
+Return the summary in the response body (`{ funded, deferred, skipped }`): it is
 the fastest way to confirm a fix without tailing logs.
 
 ## Observability
@@ -97,15 +97,15 @@ Log these; each answers a question you will actually be asked.
 | `payments.settled_via_sync` | `orderId` | Is the webhook actually working, or is the read path carrying it? |
 
 That last one is the sleeper. If `payments.settled_via_sync` is common, your
-webhook is not being delivered and you are running on the fallback — which works
+webhook is not being delivered and you are running on the fallback, which works
 until a buyer never opens the order page.
 
 Operator surfaces worth building, in value order:
 
 1. **Unfunded transfers list** with `lastError`, amount, seller, age. The single
    most useful screen; without it "the seller was never paid" is undiagnosable.
-2. **Payable balance breakdown** per seller — released, reserves, reversals,
-   adjustments, scheduled — not just the total.
+2. **Payable balance breakdown** per seller (released, reserves, reversals,
+   adjustments, scheduled), not just the total.
 3. **Gateway-fee status column** so `manual_review` rows are visible, not
    indistinguishable from unreconciled ones.
 4. **Webhook event log** with `processed_at`, filterable by type.
@@ -115,16 +115,16 @@ Operator surfaces worth building, in value order:
 **`Funds can't be sent to accounts located in XX because it's restricted outside
 of your platform's region`**
 The region rule. The order still reaches `paid` and the leg is recorded unfunded;
-the money sits on the platform balance. Not fixable on the seller by config — the
+the money sits on the platform balance. Not fixable on the seller by config: the
 account country is immutable, so they must re-onboard in a supported country.
 Once the accounts are right, the retry cron funds the historical backlog itself.
 
 **`You have insufficient available funds in your Stripe account`**
 The available balance is `0.00` because the charges behind it are still in the
-*pending* balance (the settlement delay — a young account can hold everything
+*pending* balance (the settlement delay: a young account can hold everything
 there for a week). Naming the charge as `source_transaction` removes the
 dependency entirely. Seeing this means the leg predates that fix, or the adapter
-could not resolve the charge — check for `settle.transfer_source_unresolved`.
+could not resolve the charge. Check for `settle.transfer_source_unresolved`.
 
 **Transfer rejected on currency, once the region is right**
 The platform balance is held in specific currencies, but settlement transfers in
@@ -134,12 +134,12 @@ before looking anywhere else.
 
 **Order stuck `pending` after a successful charge**
 Three distinct causes; the logs tell them apart:
-- No `stripe.webhook.received` at all → the delivery never landed. Wrong URL,
+- No `stripe.webhook.received` at all: the delivery never landed. Wrong URL,
   wrong secret, or the endpoint is behind deployment protection. The read-path
   sync should be rescuing these; if it is not, check that it is wired into the
   order page.
-- `received` with no `processed` → the fan-out threw. Read the error beside it.
-- `received` and `processed`, order still pending → settlement crashed between
+- `received` with no `processed`: the fan-out threw. Read the error beside it.
+- `received` and `processed`, order still pending: settlement crashed between
   the intent flip and the order update. The order **is** paid; never cancel it.
 
 **`500 stripe_misconfigured`**
@@ -147,7 +147,7 @@ Three distinct causes; the logs tell them apart:
 
 **`401 invalid_signature`**
 The endpoint's secret does not match the env var, or test/live are crossed. Since
-both secrets are tried, swapping them still works — two *wrong* ones do not. Also
+both secrets are tried, swapping them still works; two *wrong* ones do not. Also
 returned when the event timestamp is outside Stripe's 5-minute tolerance, which
 looks identical: check the clock before assuming the secret is wrong.
 

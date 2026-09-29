@@ -8,8 +8,8 @@ that decides whether any of it will ever work.
 **A Stripe transfer can only reach a connected account in a country your
 platform's country is allowed to transfer to.** Cross-border transfers on the
 payments balance work only *between* the United States, Canada, the United
-Kingdom, the EEA and Switzerland. A platform anywhere else — Hong Kong,
-Singapore, Malaysia, Australia, Japan, Brazil — can transfer **only to connected
+Kingdom, the EEA and Switzerland. A platform anywhere else (Hong Kong,
+Singapore, Malaysia, Australia, Japan, Brazil) can transfer **only to connected
 accounts in its own country**.
 
 It is a **transfer-time** rule, not an onboarding-time rule. That is the whole
@@ -17,12 +17,12 @@ problem:
 
 | Step | Wrong-country seller | Note |
 |---|---|---|
-| Create the connected account | ✅ succeeds | An HK platform may create a US account |
-| Seller completes onboarding | ✅ succeeds | KYC passes normally |
-| `account.updated` → charges + payouts enabled | ✅ both true | Your app marks the seller ready |
-| Buyer checkout → charge | ✅ succeeds | **The buyer's money is taken** |
-| `transfers.create` at settlement | ❌ rejected | `Funds can't be sent to accounts located in US because it's restricted outside of your platform's region` |
-| Order status | ✅ reaches `paid` | Leg recorded unfunded; **the seller is never paid** |
+| Create the connected account | Yes, succeeds | An HK platform may create a US account |
+| Seller completes onboarding | Yes, succeeds | KYC passes normally |
+| `account.updated` sets charges and payouts enabled | Yes, both true | Your app marks the seller ready |
+| Buyer checkout charges the card | Yes, succeeds | **The buyer's money is taken** |
+| `transfers.create` at settlement | No, rejected | `Funds can't be sent to accounts located in US because it's restricted outside of your platform's region` |
+| Order status | Yes, reaches `paid` | Leg recorded unfunded; **the seller is never paid** |
 
 Nothing warns you until real money has moved, and the seller looks perfectly
 healthy right up to the moment it cannot be paid.
@@ -48,7 +48,7 @@ on the standard rails.**
 | # | Option | Cost |
 |---|---|---|
 | A | Keep the platform where it is; onboard sellers **in the same country** | A code change to the country list, plus re-onboarding |
-| B | Move the platform into the corridor (US/CA/GB/EEA/CH) | **A new platform account** — country is immutable. New keys, re-onboard every seller, re-register webhooks, and a legal entity in that country. 0.25% cross-border fee (waived within the EEA and UK↔EEA) |
+| B | Move the platform into the corridor (US/CA/GB/EEA/CH) | **A new platform account**: country is immutable. New keys, re-onboard every seller, re-register webhooks, and a legal entity in that country. 0.25% cross-border fee (waived within the EEA and between the UK and the EEA) |
 | C | Ask Stripe for Cross-border / Global payouts | Not self-serve outside the corridor; commercial negotiation, unknown lead time. Unavailable on a recipient service agreement |
 
 ### Constrain the country picker to the answer
@@ -65,17 +65,17 @@ country, so every tester accepted the default and every account was unpayable.
  * can never drift into an unpayable seller.
  *
  * PAYOUT ACCOUNTS ONLY. This list answers "where can this seller open a Stripe
- * account", never "where is this address". Anything postal — a service address,
- * a shipping address, an identity document — must use the full ISO-3166 list, or
+ * account", never "where is this address". Anything postal (a service address,
+ * a shipping address, an identity document) must use the full ISO-3166 list, or
  * you strand sellers in the ~180 countries Stripe does not cover here.
  *
- * Pure data, no imports — safe to import from a client component.
+ * Pure data, no imports, so safe to import from a client component.
  */
 export const STRIPE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: "US", label: "United States" },
   { value: "GB", label: "United Kingdom" },
   { value: "CA", label: "Canada" },
-  // … the corridor, or your single country
+  // ... the corridor, or your single country
 ];
 
 export const DEFAULT_STRIPE_COUNTRY = "US";
@@ -83,19 +83,19 @@ export const DEFAULT_STRIPE_COUNTRY = "US";
 
 ### A wrong-country account cannot be fixed
 
-**A connected account's country is immutable after creation** — Standard, Express
+**A connected account's country is immutable after creation**: Standard, Express
 and Custom alike. No patch, no support ticket, no migration. To fix a seller:
 
 1. Clear their stored `stripe_account_id` (and any partner account row), so your
    code creates a fresh account instead of reusing the old id.
 2. Have them run onboarding again, picking the correct country.
-3. Leave the old `acct_…` dormant (test mode) or reject it (live).
+3. Leave the old `acct_...` id dormant (test mode) or reject it (live).
 
 ## Creating the account
 
 Accounts v2 (`POST /v2/core/accounts`) with an Express dashboard. v2 accounts stay
-**v1-interoperable**: the `acct_…` id works with v1 PaymentIntents and transfers,
-and — critically — still emits the classic `account.updated` Connect event, so
+**v1-interoperable**: the `acct_...` id works with v1 PaymentIntents and transfers,
+and, critically, still emits the classic `account.updated` Connect event, so
 the webhook receiver below is unchanged by the v2 migration.
 
 ```ts
@@ -110,12 +110,12 @@ export type StripeOnboardingLink = { accountId: string; url: string };
  * which is what keeps it the platform of record under separate charges and
  * transfers.
  *
- * Account links are single-use and short-lived — always mint a new one rather
+ * Account links are single-use and short-lived: always mint a new one rather
  * than storing the URL.
  */
 export async function createExpressOnboardingLink(opts: {
   existingAccountId?: string | null;
-  /** ISO-3166 alpha-2. Must be in STRIPE_COUNTRIES — see the region rule above. */
+  /** ISO-3166 alpha-2. Must be in STRIPE_COUNTRIES; see the region rule above. */
   country: string;
   email?: string | null;
   refreshUrl: string;
@@ -175,8 +175,8 @@ Structure travels; the auth guard and validation are seams.
 export const dynamic = "force-dynamic";
 
 export const POST = route(async (req, { requestId }) => {
-  const { user, claims } = await requireSession();            // ← host's auth seam
-  const input = await parseBody(req, Body);                   // ← host's validation seam
+  const { user, claims } = await requireSession();            // host's auth seam
+  const input = await parseBody(req, Body);                   // host's validation seam
 
   // Authorize BEFORE touching the service-role client. Only the seller's own
   // owner/admin may onboard its payment account.
@@ -215,7 +215,7 @@ export const POST = route(async (req, { requestId }) => {
 });
 ```
 
-`refreshUrl` is where Stripe sends a seller whose link expired — it must mint a
+`refreshUrl` is where Stripe sends a seller whose link expired, and it must mint a
 new link, so point it back at the same flow, not at a static page.
 
 ## `account.updated`
@@ -223,6 +223,7 @@ new link, so point it back at the same flow, not at a static page.
 The only signal that a seller can actually trade. Both flags must be true.
 
 ```ts
+// lib/payments/onboarding.ts
 export async function applyAccountUpdate(
   account: Stripe.Account,
   requestId?: string,
@@ -232,7 +233,7 @@ export async function applyAccountUpdate(
 
   // Partner (per-membership) accounts share this event. Reconcile them FIRST,
   // and before any `ready` short-circuit, so a capability being *pulled* is
-  // reflected too — that is the case the short-circuit would swallow.
+  // reflected too: that is the case the short-circuit would swallow.
   const partner = await store.applyPartnerAccountUpdate(
     account.id,
     chargesEnabled,
@@ -243,7 +244,7 @@ export async function applyAccountUpdate(
   if (!(chargesEnabled && payoutsEnabled)) return { handled: "unknown" };
 
   const tenant = await store.getTenantByStripeAccount(account.id);
-  if (!tenant) return { handled: "unknown" };       // not ours — ACK and move on
+  if (!tenant) return { handled: "unknown" };       // not ours: ACK and move on
   if (tenant.paymentsReady) return { handled: "tenant" };  // duplicate delivery
 
   await store.setPaymentsReady(tenant.id, true);
@@ -259,11 +260,12 @@ export async function applyAccountUpdate(
 
 ### Capability state, for per-membership partner accounts
 
-Only assert a KYC status when capabilities cross a **meaningful boundary** —
+Only assert a KYC status when capabilities cross a **meaningful boundary**;
 otherwise a seller still working through onboarding flips to a scary
 `restricted` the moment Stripe emits an interim update.
 
 ```ts
+// lib/payments/onboarding.ts, inside applyAccountUpdate
 let nextKyc = prior.kycStatus;
 if (chargesEnabled && payoutsEnabled) {
   nextKyc = "verified";

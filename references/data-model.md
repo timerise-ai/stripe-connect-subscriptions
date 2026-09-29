@@ -48,7 +48,7 @@ export type TransferRow = {
   membershipId: string | null;
   amount: string;
   currencyCode: string;
-  /** Null while the leg is unfunded — the money did not move. */
+  /** Null while the leg is unfunded: the money did not move. */
   externalId: string | null;
   status: TransferStatus;
   retryAttempts: number;
@@ -92,6 +92,7 @@ Amounts are `numeric(19,4)`; times are `timestamptz` in UTC. Adjust schema names
 and the `tenants`/`orders` foreign keys to your host's vocabulary.
 
 ```sql
+-- migrations/0001_payments.sql
 -- The buyer-side charge. `external_id` is unique so a webhook can resolve an
 -- order from Stripe's id alone.
 create table payment_intents (
@@ -223,10 +224,10 @@ Columns added to your existing tables:
 ```sql
 -- Sellers
 alter table tenants
-  add column stripe_account_id text unique,       -- acct_… ; unique so a webhook resolves one row
+  add column stripe_account_id text unique,       -- acct_...; unique so a webhook resolves one row
   add column payments_ready boolean not null default false,
   add column compliance_hold boolean not null default false,
-  -- Platform-subscription billing instrument. Brand/last4 only — never the PAN.
+  -- Platform-subscription billing instrument. Brand/last4 only, never the PAN.
   add column billing_customer_id text,
   add column billing_payment_method_id text,
   add column billing_card_brand text,
@@ -298,7 +299,7 @@ if carts routinely carry many sellers.
 
 ## Access-control posture
 
-State this explicitly — the most common porting mistake is assuming the absence
+State this explicitly: the most common porting mistake is assuming the absence
 of policies is safe.
 
 - **All writes in this module are server-side, via a service role that bypasses
@@ -307,7 +308,7 @@ of policies is safe.
 - **Reads are policy-gated**: super-admin sees everything; a seller sees rows
   scoped to its own `tenant_id`; a buyer sees its own order's intent.
 - `payment_intents.raw` and `webhook_events.payload` hold provider payloads.
-  Restrict them to admins — they carry card metadata and customer detail.
+  Restrict them to admins: they carry card metadata and customer detail.
 
 Supabase RLS shape, with the performance form that matters (the wrapped
 `(select auth.jwt())` is hoisted by the planner; a bare `auth.jwt()` re-evaluates
