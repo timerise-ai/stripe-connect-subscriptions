@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.11] - 2026-09-29
+
+Fix release, from scoring the prompt-1 agent eval runs against 0.1.10.
+
+### Fixed
+- Settlement writes the escrow holds, the reserve and the vendor order's status for every vendor order on every
+  run (`settlement.md`). Written only beside a newly created seller leg, they were skipped on resume after a
+  crash, and never written for a seller not yet onboarded, whose transfer the retry sweep later funded with
+  nothing to release it. `escrow_holds.order_item_id` and the new `reserves.vendor_order_id` are unique, the
+  two store inserts ignore a duplicate, and `release-escrow` waits for a funded seller leg. Apps built from
+  earlier versions should add the migration, the insert-or-ignore and the release condition, and create
+  holds for any paid vendor order that has none.
+
+### Changed
+- The quick start names the seams (store implementation, auth, validation, audit) and says settlement,
+  retry, onboarding and money logic are copied, not redesigned; a payout hold sets both escrow constants; the
+  handover is in the final message.
+- `provenance.md` records the fix under *Added*; the ledger has eighteen entries.
+
 ## [0.1.10] - 2026-09-29
 
 Fix release, from scoring the prompt-1 agent eval runs against 0.1.9.
