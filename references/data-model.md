@@ -7,7 +7,10 @@ the settlement claim safely, and a marketplace that double-pays is worse than on
 that ships later.
 
 Reference implementations here: raw SQL/Postgres (portable to Drizzle, Prisma,
-Kysely) and the Supabase client. Pick the one your host already uses. The
+Kysely) and the Supabase client. Pick the one your host already uses; a host
+with no database gets the raw-SQL store on Postgres through `pg`, with the
+migration below. An in-memory store is a test fixture, never the default: the
+ledger is the record of who is owed money, and it must survive a restart. The
 data-access contract every module in this skill calls is in
 [store.md](store.md).
 

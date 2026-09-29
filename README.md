@@ -20,7 +20,7 @@ Written by the engineers who have shipped this module. The earlier implementatio
 the payments and billing module of a multi-vendor marketplace on Stripe Connect. The templates hold four
 properties end to end: every webhook is claimed once and re-run to completion after a crash, every transfer is
 retried with adoption rather than re-sent, every seller is inside the platform's payout corridor before a
-charge is split, and every fee, reversal and clawback reconciles to the ledger. The money module's nine tests
+charge is split, and every fee, reversal and clawback reconciles to the ledger. The money module's ten tests
 pin the rounding and distribution; the atomic claims in the store contract carry the rest. The record of what
 the audit changed is in [`references/provenance.md`](references/provenance.md).
 

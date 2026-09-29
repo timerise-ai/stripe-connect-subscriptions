@@ -116,6 +116,17 @@ Not in the earlier implementation; designed in the skill and marked as such.
 - **The alerting list** in [operations.md](operations.md). The earlier
   implementation had the logs and the admin surfaces but no documented alerts.
 - **The "leave behind" guidance** in [adaptation.md](adaptation.md).
+- **Manual payouts on every connected account**, in
+  [connect-accounts.md](connect-accounts.md). Found by the 0.1.9 agent eval: the
+  onboarding template left accounts on Stripe's automatic schedule, which pays
+  the connected balance out before the escrow hold releases and bypasses the
+  payout gate. Set through the Balance Settings API, which is how Accounts v2
+  sets a payout schedule; it has not run against a live account.
+- **`distribute` ranks remainders by magnitude**, in [money.md](money.md). Found
+  by the 0.1.9 agent eval: a negative total ranked its negative remainders by
+  value and handed the leftover grain to the smallest share, so `-0.0200` over
+  weights `[1, 2]` split as `0.0000, -0.0200` instead of mirroring the positive
+  split. The money test that pins the mirror fails on the old code.
 
 ## Not verified
 

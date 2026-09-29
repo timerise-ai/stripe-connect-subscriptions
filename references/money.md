@@ -213,9 +213,16 @@ export function distribute(total: string, weights: number[], fractionDigits = 2)
   }
 
   // Hand the leftover grains to the largest remainders, one at a time. `step`
-  // is signed so a negative total (a reversal) distributes correctly too.
+  // is signed so a negative total (a reversal) distributes correctly too, and
+  // remainders rank by magnitude: a negative total has negative remainders, and
+  // ranking those by value would hand the grain to the smallest one.
   let leftover = totalGrains - allocated;
-  remainders.sort((a, b) => (b.rem === a.rem ? 0 : b.rem > a.rem ? 1 : -1));
+  const magnitude = (r: bigint): bigint => (r < B0 ? -r : r);
+  remainders.sort((a, b) => {
+    const ra = magnitude(a.rem);
+    const rb = magnitude(b.rem);
+    return ra === rb ? a.idx - b.idx : rb > ra ? 1 : -1;
+  });
   const step = leftover >= B0 ? B1 : -B1;
   let k = 0;
   while (leftover !== B0) {
@@ -240,7 +247,9 @@ partial refund across transfers, splitting shipping and tax across line items.
 
 ## Tests worth keeping
 
-These encode the properties the module claims. Port them with the code.
+These encode the properties the module claims. Copy them unmodified with the code
+and run them under `vitest` from `npm test`: ten tests. Converting them to another
+runner is a rewrite, and a rewrite is how a property quietly stops being tested.
 
 ```ts
 // lib/payments/money.test.ts
@@ -267,6 +276,11 @@ describe("distribute", () => {
     for (const part of distribute("10.0000", [1, 1, 1])) {
       expect(() => toMinorUnits(part)).not.toThrow();
     }
+  });
+
+  it("splits a negative total as the mirror of the positive one", () => {
+    expect(distribute("0.0200", [1, 2])).toEqual(["0.0100", "0.0100"]);
+    expect(distribute("-0.0200", [1, 2])).toEqual(["-0.0100", "-0.0100"]);
   });
 
   it("does not mutate the input weights", () => {

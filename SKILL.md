@@ -109,15 +109,26 @@ platform --off_session PaymentIntent (customer + saved PM)--> subscription invoi
 
 ## Quick start
 
+The code blocks are the module: copy them verbatim apart from the renames and seams in
+[adaptation.md](references/adaptation.md). A template that looks wrong is named in the handover, not patched.
+
 1. Model the money: [money.md](references/money.md), [data-model.md](references/data-model.md),
-   [store.md](references/store.md).
-2. Client, dual webhook secrets, env: [stripe-adapter.md](references/stripe-adapter.md).
-3. Onboard accounts; **check the region rule first**: [connect-accounts.md](references/connect-accounts.md).
+   [store.md](references/store.md). Install what the module imports: `stripe`, `vitest` and, when the host
+   has no database, `pg` for the raw-SQL store. The package registry is not an external service. An
+   in-memory store is for tests only.
+2. Client, dual webhook secrets, env: [stripe-adapter.md](references/stripe-adapter.md). `.env.example`
+   lists all five variables in [operations.md](references/operations.md), empty and tracked; invent none.
+3. Onboard accounts on manual payouts; **check the region rule first**:
+   [connect-accounts.md](references/connect-accounts.md).
 4. Receive events idempotently: [webhooks.md](references/webhooks.md).
-5. Settle by claim, fan-out, escrow and reserve: [settlement.md](references/settlement.md).
+5. Settle by claim, fan-out, escrow and reserve: [settlement.md](references/settlement.md). A payout hold
+   ("paid out after N days") is the escrow window; the transfer still runs at settlement, never later.
 6. Converge by retrying legs and reconciling fees: [reconciliation.md](references/reconciliation.md).
 7. Bill tenants: [subscriptions.md](references/subscriptions.md); run it with
    [operations.md](references/operations.md).
+8. Wire `money.test.ts`, unmodified, to `npm test` under `vitest`; report its ten tests. Hand over the
+   region check for the platform's country, the two webhook endpoints and their secrets, and the crons
+   behind `CRON_SECRET`.
 
 Fit it to your app with [adaptation.md](references/adaptation.md), which carries the
 seam contract with the host; the record of the audit is in

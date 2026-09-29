@@ -69,13 +69,16 @@ country, so every tester accepted the default and every account was unpayable.
  * a shipping address, an identity document) must use the full ISO-3166 list, or
  * you strand sellers in the ~180 countries Stripe does not cover here.
  *
+ * Ships as one country, the platform's own (`US` here, the default when the
+ * platform's country is unknown). A platform can always pay accounts in its own
+ * country, so this list is never unpayable. Widen it only to the checked
+ * `supported_transfer_countries` output, never to a list recalled from memory,
+ * and never derive it at runtime from an env var.
+ *
  * Pure data, no imports, so safe to import from a client component.
  */
 export const STRIPE_COUNTRIES: Array<{ value: string; label: string }> = [
   { value: "US", label: "United States" },
-  { value: "GB", label: "United Kingdom" },
-  { value: "CA", label: "Canada" },
-  // ... the corridor, or your single country
 ];
 
 export const DEFAULT_STRIPE_COUNTRY = "US";
@@ -144,6 +147,16 @@ export async function createExpressOnboardingLink(opts: {
     });
     accountId = account.id;
   }
+
+  // Manual payouts. Left on the default automatic schedule, Stripe pays the
+  // connected balance out to the seller's bank on its own, days before the
+  // escrow hold releases, and the payout gate in settlement.md never runs.
+  // Applied on every call, not only on creation, so an account created before
+  // this line is corrected on its next onboarding visit.
+  await stripe.balanceSettings.update(
+    { payments: { payouts: { schedule: { interval: "manual" } } } },
+    { stripeAccount: accountId },
+  );
 
   const link = await stripe.v2.core.accountLinks.create({
     account: accountId,

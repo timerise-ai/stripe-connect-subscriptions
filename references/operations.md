@@ -10,7 +10,14 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...   # pk_live_... in production
 STRIPE_SECRET_KEY=sk_test_...                    # sk_live_... in production
 STRIPE_WEBHOOK_SECRET=whsec_...                  # endpoint A: platform events
 STRIPE_CONNECT_WEBHOOK_SECRET=whsec_...          # endpoint B: account.updated
+CRON_SECRET=...                                  # guards the cron URL triggers
 ```
+
+Ship these five names in a tracked `.env.example`, every value empty, and add
+`!.env.example` to `.gitignore` when it ignores `.env*`. Add only what the host's
+own seams need (a database URL, its auth secret); never a variable that stands in
+for something the templates hard-code, such as the platform's country, which
+lives in `STRIPE_COUNTRIES` ([connect-accounts.md](connect-accounts.md)).
 
 Test and live keys are different. Crossing them fails in ways that read like code
 bugs: a live webhook secret verified with test keys fails signature checks, and a

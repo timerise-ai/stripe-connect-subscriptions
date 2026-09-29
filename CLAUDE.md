@@ -16,7 +16,7 @@ all run in that generated app.
 
 The skill was written by the engineers who have shipped this module; the earlier implementation it was
 audited against was the payments and billing module of a multi-vendor marketplace on Stripe Connect.
-`references/provenance.md` is the ledger of that audit: fifteen entries, split into what the audit fixed and
+`references/provenance.md` is the ledger of that audit: seventeen entries, split into what the audit fixed and
 how the templates verify it, what was kept deliberately, and what was designed here and has never run in
 production, plus the claims that could not be verified. That file is the rationale layer: read it before
 "simplifying" anything.
@@ -61,7 +61,7 @@ production, plus the claims that could not be verified. That file is the rationa
   country lists for payouts and addresses: each is a ledger entry. Check `provenance.md` before touching one.
 - **The numbers that remain are load-bearing.** Stripe's 24-hour idempotency window, the `numeric(19,4)`
   money type, the 300-second settlement lease, three dunning attempts three days apart, the money module's
-  nine tests and the ledger's fifteen entries. They are vendor facts, design parameters or counts of this
+  ten tests and the ledger's seventeen entries. They are vendor facts, design parameters or counts of this
   repository. Do not restate them loosely and do not add new ones. Figures describing the earlier
   implementation's deployment do not appear anywhere.
 - **Mark additions as additions.** Anything designed in the skill and never run in the earlier implementation,

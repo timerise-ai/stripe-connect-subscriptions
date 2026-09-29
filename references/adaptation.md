@@ -155,7 +155,8 @@ will wonder whether it was an omission.
 
 ## Checklist
 
-- [ ] `package.json`, `CLAUDE.md`/`AGENTS.md` read; no new dependency added unasked
+- [ ] `package.json`, `CLAUDE.md`/`AGENTS.md` read; no dependency added beyond `stripe`, `vitest` and,
+      when the host has no database, `pg`
 - [ ] Two existing route handlers read; house pattern written down
 - [ ] Rename confirmed with the user, applied everywhere at once
 - [ ] Stripe/technical terms left alone

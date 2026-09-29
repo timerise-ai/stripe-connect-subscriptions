@@ -294,6 +294,14 @@ Physical goods get a longer window than services; define both constants in one
 place so the persisted `release_at` and the release-eligibility check cannot
 drift.
 
+A task that asks for a payout hold ("paid out after N days") sets these
+constants and nothing else. The transfer still runs at settlement, with
+`source_transaction`; the hold lives on the payable balance, and the connected
+account's manual payout schedule ([connect-accounts.md](connect-accounts.md)) is
+what keeps Stripe from paying the seller before it releases. Delaying the
+transfer instead is a different money model: the retry sweep, the escrow release
+and the payable balance all assume the seller's leg moved at settlement.
+
 ```ts
 export const PHYSICAL_ESCROW_DAYS = 14;
 export const SERVICE_ESCROW_HOURS = 48;
