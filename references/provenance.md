@@ -127,6 +127,14 @@ Not in the earlier implementation; designed in the skill and marked as such.
   value and handed the leftover grain to the smallest share, so `-0.0200` over
   weights `[1, 2]` split as `0.0000, -0.0200` instead of mirroring the positive
   split. The money test that pins the mirror fails on the old code.
+- **The escrow holds and the reserve are written for every vendor order on every
+  run**, in [settlement.md](settlement.md). Found by the 0.1.10 agent eval. They
+  were written only beside a newly created seller leg, so a crash between that
+  leg and its holds skipped them on resume, and a seller not yet onboarded never
+  got them: the retry sweep then funded a transfer that no payout released. The
+  inserts are idempotent on a unique key, and the escrow release waits for a
+  funded seller leg. Neither the crash path nor the late-onboarding path has
+  run.
 
 ## Not verified
 

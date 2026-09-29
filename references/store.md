@@ -54,8 +54,10 @@ export interface PaymentsStore {
   reversalsForTransfer(transferId: string): Promise<{ amount: string }[]>;
 
   // --- ledger --------------------------------------------------------------
-  insertEscrowHold(h: NewEscrowHold): Promise<{ id: string }>;
-  holdReserve(r: NewReserve): Promise<{ id: string }>;
+  /** Insert or ignore on `order_item_id`: a settlement re-run adds nothing. */
+  insertEscrowHold(h: NewEscrowHold): Promise<void>;
+  /** Insert or ignore on `vendor_order_id`: a settlement re-run adds nothing. */
+  holdReserve(r: NewReserve): Promise<void>;
   createAdjustment(a: NewAdjustment): Promise<{ id: string }>;
   payoutSchedule(tenantId: string): Promise<{ cadence: string } | null>;
   sumEscrow(tenantId: string, currency: string, status: EscrowStatus): Promise<string>;
@@ -220,6 +222,8 @@ export type NewEscrowHold = {
 };
 
 export type NewReserve = {
+  /** Null for a reserve not accrued from a sale, such as a manual one. */
+  vendorOrderId: string | null;
   tenantId: string;
   amount: string;
   currency: string;

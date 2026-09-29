@@ -126,6 +126,7 @@ async function runSettlement(ctx: {
         });
         transfersCreated++;
       }
+      await recordVendorLedger(vo);
       continue;
     }
 
@@ -196,11 +197,9 @@ async function runSettlement(ctx: {
         status: sellerTransfer.status,
       });
       transfersCreated++;
-
-      await createEscrowHolds(vo.id, vo.tenantId, vo.currencyCode);
-      await accrueReserve(vo.tenantId, vo.currencyCode, vo.vendorNet);
-      await store.setVendorOrderStatus(vo.id, "paid");
     }
+
+    await recordVendorLedger(vo);
   }
 
   await store.setIntentStatus(intent.id, "succeeded");
@@ -294,8 +293,31 @@ Physical goods get a longer window than services; define both constants in one
 place so the persisted `release_at` and the release-eligibility check cannot
 drift.
 
+The holds, the reserve and the vendor order's status are written for **every**
+vendor order on **every** run, not only when a seller leg was just created. Keyed
+on the transfer set, a crash after the seller leg was written skipped them on
+resume, and a seller who had not onboarded never got them at all, so the retry
+sweep funded a transfer that no payout would ever release. Both inserts are
+idempotent on a unique key ([store.md](store.md)), so a re-run adds nothing twice.
+
+```ts
+async function recordVendorLedger(vo: VendorOrderRow): Promise<void> {
+  await createEscrowHolds(vo.id, vo.tenantId, vo.currencyCode);
+  await accrueReserve(vo.id, vo.tenantId, vo.currencyCode, vo.vendorNet);
+  await store.setVendorOrderStatus(vo.id, "paid");
+}
+```
+
+The `release-escrow` sweep releases a due hold only once its vendor order has a
+funded seller leg (`store.fundedSellerTransfer`). A hold on a leg the retry sweep
+has not funded yet waits: releasing it would put money into the payable balance
+that is not on the connected account, and the payout for the whole balance
+would be rejected.
+
 A task that asks for a payout hold ("paid out after N days") sets these
-constants and nothing else. The transfer still runs at settlement, with
+constants and nothing else: `PHYSICAL_ESCROW_DAYS` to N and
+`SERVICE_ESCROW_HOURS` to N times 24, both names kept, neither merged into a new
+one. The transfer still runs at settlement, with
 `source_transaction`; the hold lives on the payable balance, and the connected
 account's manual payout schedule ([connect-accounts.md](connect-accounts.md)) is
 what keeps Stripe from paying the seller before it releases. Delaying the
@@ -334,6 +356,7 @@ export const DEFAULT_RESERVE_PCT = "0.0500";
 const RESERVE_RELEASE_DAYS = 90;
 
 async function accrueReserve(
+  vendorOrderId: string,
   tenantId: string,
   currency: string,
   vendorNet: string,
@@ -345,6 +368,7 @@ async function accrueReserve(
   const amount = roundToMinorUnits(mulRate(vendorNet, DEFAULT_RESERVE_PCT));
   if (isZero(amount)) return;
   await store.holdReserve({
+    vendorOrderId,
     tenantId,
     amount,
     currency,

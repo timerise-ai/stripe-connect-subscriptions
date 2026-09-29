@@ -168,11 +168,16 @@ create table escrow_holds (
   release_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+-- One hold per item: settlement writes holds on every run, and this makes the
+-- re-run a no-op (insert ... on conflict (order_item_id) do nothing).
+create unique index escrow_holds_item_uniq on escrow_holds (order_item_id);
 create index escrow_holds_release_idx on escrow_holds (release_at) where status = 'held';
 create index escrow_holds_tenant_idx on escrow_holds (tenant_id, currency_code, status);
 
 create table reserves (
   id uuid primary key default gen_random_uuid(),
+  -- Set when accrued from a sale; unique so a settlement re-run accrues once.
+  vendor_order_id uuid unique references vendor_orders(id),
   tenant_id uuid not null references tenants(id),
   amount numeric(19,4) not null,
   currency_code char(3) not null,

@@ -316,7 +316,7 @@ async function clawBackFee(row: FeeRow, portion: string): Promise<void> {
 |---|---|---|
 | `retry-transfers` | every 20 min | Legs the provider rejected |
 | `sweep-gateway-fees` | hourly | Rows stuck `pending`/`allocated`: a missing `charge.succeeded` registration, a transient error |
-| `release-escrow` | hourly | Holds whose `release_at` has passed |
+| `release-escrow` | hourly | Holds whose `release_at` has passed and whose seller leg is funded |
 | `reconcile-orphan-payments` | hourly | Charges with no settled order |
 
 **Never let a sweep cap silently.** If a run is bounded (`SWEEP_ROW_LIMIT`), log

@@ -110,7 +110,9 @@ platform --off_session PaymentIntent (customer + saved PM)--> subscription invoi
 ## Quick start
 
 The code blocks are the module: copy them verbatim apart from the renames and seams in
-[adaptation.md](references/adaptation.md). A template that looks wrong is named in the handover, not patched.
+[adaptation.md](references/adaptation.md). The seams are the store's implementation, auth, validation and
+audit; settlement, retry, onboarding and money logic are never redesigned, and no lock is added around the
+leased claim. A template that looks wrong is named in the handover, not patched.
 
 1. Model the money: [money.md](references/money.md), [data-model.md](references/data-model.md),
    [store.md](references/store.md). Install what the module imports: `stripe`, `vitest` and, when the host
@@ -122,13 +124,14 @@ The code blocks are the module: copy them verbatim apart from the renames and se
    [connect-accounts.md](references/connect-accounts.md).
 4. Receive events idempotently: [webhooks.md](references/webhooks.md).
 5. Settle by claim, fan-out, escrow and reserve: [settlement.md](references/settlement.md). A payout hold
-   ("paid out after N days") is the escrow window; the transfer still runs at settlement, never later.
+   ("paid out after N days") sets both escrow constants to that window, names kept; the transfer still runs
+   at settlement, never later.
 6. Converge by retrying legs and reconciling fees: [reconciliation.md](references/reconciliation.md).
 7. Bill tenants: [subscriptions.md](references/subscriptions.md); run it with
    [operations.md](references/operations.md).
-8. Wire `money.test.ts`, unmodified, to `npm test` under `vitest`; report its ten tests. Hand over the
-   region check for the platform's country, the two webhook endpoints and their secrets, and the crons
-   behind `CRON_SECRET`.
+8. Wire `money.test.ts`, unmodified, to `npm test` under `vitest`; report its ten tests. The final message
+   itself, not only a README, names the region check for the platform's country, the two webhook endpoints
+   and their secrets, and the crons behind `CRON_SECRET`.
 
 Fit it to your app with [adaptation.md](references/adaptation.md), which carries the
 seam contract with the host; the record of the audit is in
