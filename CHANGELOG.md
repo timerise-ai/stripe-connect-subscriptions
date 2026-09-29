@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Brings the repository to the current skill standard. The money model, the templates' logic and the
+non-negotiables are unchanged from 0.1.8.
+
+### Added
+- `CLAUDE.md`, the editing conventions for an agent working on the skill itself.
+- `evals/prompts.md`, the three prompts the agent evals run, and
+  `.github/workflows/agent-eval.yml`, the index's eval caller, copied verbatim from the standard.
+- `adaptation.md` opens its seam section with the full seam table.
+
+### Changed
+- `SKILL.md` keeps only the headings of the standard: the Adaptation Contract table moves to
+  `adaptation.md`, which the quick start names as the seam contract. The frontmatter description names the
+  `PaymentsStore` seam.
+- README: the intro is three paragraphs, the manual clone sits under *Manual install*, the file table lists
+  every file in the repository, the non-negotiables use the same wording as the hard rules, and
+  *Contributing* points to `CLAUDE.md`.
+- Every em-dash, en-dash, arrow and other non-ASCII symbol in the repository's markdown is rewritten in
+  plain punctuation, and every diagram is redrawn in ASCII.
+
+### Fixed
+- Code blocks that named no destination now do: `subscriptions.md`, `settlement.md`,
+  `reconciliation.md`, `store.md`, `connect-accounts.md` and the schema in `data-model.md`.
+- The money module lives at `lib/payments/money.ts`, where `stripe-adapter.md` already imported it from;
+  `money.md` named `lib/money.ts`.
+- Older changelog entries no longer use the standard's banned words.
+
 ## [0.1.8] - 2026-09-21
 
 Wording release. The skill content is unchanged from 0.1.7.
@@ -63,8 +91,8 @@ unchanged from 0.1.3.
   Claude Code, Codex CLI and Gemini CLI compatibility.
 
 ### Changed
-- README: the install leads with `npx skills add timerise-ai/stripe-connect-subscriptions`, which installs the skill
-  into every skills-compatible agent it detects, with the `-a` form for named agents; the
+- README: the install leads with `npx skills add timerise-ai/stripe-connect-subscriptions`,
+  which installs the skill into every skills-compatible agent it detects, with the `-a` form for named agents; the
   Claude Code clone moves under a *Manual install* heading. Activation gets its own
   heading, and a *Not this* table points neighbouring problems to the right skill or tool.
 - README: *Usage* becomes *Activation*, *What it covers* becomes *What's inside*, *The five
@@ -72,13 +100,13 @@ unchanged from 0.1.3.
   favour of the current-release line and this changelog.
 - README: the skill's origin is reworded. It was written by the engineers who built the
   module it describes; the reference point for `provenance.md` is the earlier
-  implementation rather than "the source"; the index is called Timerise Skills.
+  implementation, named in the standard's words; the index is called Timerise Skills.
 - README: every em-dash, arrow and en-dash in the prose is rewritten as a comma, colon,
   full stop or conjunction.
 
 ## [0.1.3] - 2026-09-01
 
-Documentation only — the skill content is unchanged from 0.1.2.
+Documentation only. The skill content is unchanged from 0.1.2.
 
 ### Added
 - A one-command install via [skills.sh](https://www.skills.sh),
@@ -91,8 +119,8 @@ Documentation only — the skill content is unchanged from 0.1.2.
 
 ### Changed
 - The adaptation section now states that the `store` seam requires a
-  **relational** backend — the ledger relies on `sum()` over indexed rows, a
-  unique constraint for webhook idempotency, and atomic conditional updates —
+  **relational** backend, since the ledger relies on `sum()` over indexed rows, a
+  unique constraint for webhook idempotency, and atomic conditional updates,
   and names the two reference implementations that ship: raw SQL/Postgres and
   the Supabase client.
 - The intro calls the module an Agent Skill rather than a Claude Code skill,
@@ -111,7 +139,7 @@ Documentation only — the skill content is unchanged from 0.1.2.
 
 ## [0.1.1] - 2026-08-29
 
-Documentation and licensing only — the skill content is unchanged from 0.1.0.
+Documentation and licensing only. The skill content is unchanged from 0.1.0.
 
 ### Added
 - `README.md` covering installation (personal and project scope), usage and
@@ -119,7 +147,7 @@ Documentation and licensing only — the skill content is unchanged from 0.1.0.
   versioning and contributing conventions.
 - The five hard rules reproduced in the README, so the module's
   non-negotiables are visible without opening `SKILL.md`.
-- `LICENSE` — MIT. The README declared MIT but no license text shipped, leaving
+- `LICENSE`: MIT. The README declared MIT but no license text shipped, leaving
   the terms unenforceable for anyone cloning the skill.
 - A link to the [Timerise skills index](https://github.com/timerise-ai/skills)
   and a note that the skill can also be invoked explicitly with
@@ -147,13 +175,13 @@ Initial release of the stripe-connect-subscriptions skill.
   and clawback reconciliation (`reconciliation.md`), off-session billing and
   dunning (`subscriptions.md`), setup and runbook (`operations.md`), and the
   host-fitting seams (`adaptation.md`).
-- `references/provenance.md` recording what was extracted from the source
-  module, what was kept deliberately, what was designed here (the
+- `references/provenance.md` recording what the audit of the earlier
+  implementation changed, what was kept deliberately, what was designed here (the
   `PaymentsStore` seam, the alerting list, the "leave behind" guidance), and
   which claims could not be verified.
 
 ### Fixed
-Hardened against four defects found while auditing the source module:
+Hardened against four defects found while auditing the earlier implementation:
 - Crash-resume in settlement keyed the skip set on `vendorOrderId` alone, so a
   crash between the partner and seller transfer writes stranded the seller leg
   permanently. Templates ship two resume sets filtered by `destinationKind`.

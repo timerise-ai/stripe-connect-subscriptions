@@ -3,7 +3,7 @@ name: stripe-connect-subscriptions
 description: >
   Build Stripe Connect marketplace money movement and Stripe platform subscription
   billing in a Next.js App Router app. Use when: (1) one buyer charge must split
-  across several sellers — separate charges and transfers, transfer groups, escrow,
+  across several sellers: separate charges and transfers, transfer groups, escrow,
   rolling reserves, payouts to connected accounts; (2) implementing Connect account
   onboarding, `account.updated` capability flags, or debugging why a connected
   account is never funded; (3) charging tenants a recurring platform fee off-session
@@ -17,7 +17,8 @@ description: >
   internals the store's atomic claims and the money tests verify: webhook
   idempotency, single-flight claims, transfer retry with adoption, and the region
   rule that decides whether a connected account can be paid at all. Next.js App
-  Router oriented; backend-agnostic. Not a general checkout or PayPal skill.
+  Router oriented; the data layer is one PaymentsStore seam, so any relational
+  backend fits. Not a general checkout or PayPal skill.
 ---
 
 # Stripe Connect & Subscription Billing
@@ -50,18 +51,18 @@ must stay re-drivable later without paying anyone twice.
 ## Architecture
 
 ```
-buyer ──charge (platform account, transfer_group = orderId)──▶ platform balance
-                │  settlement fan-out (webhook OR read-path sync; leased claim)
-   ┌────────────┴──┬────────────────────────┬────────────────┐
-   ▼               ▼                        ▼                ▼
+buyer --charge (platform account, transfer_group = orderId)--> platform balance
+                |  settlement fan-out (webhook OR read-path sync; leased claim)
+   +------------+--+------------------------+----------------+
+   v               v                        v                v
 transfer:merchant  transfer:partner    escrow hold     rolling reserve
 (source_transaction = the charge)      (release_at)    (% withheld)
-   │                                        │  release-escrow cron
-   ▼                                        ▼
-connected balance ◀── retry-transfers  payable balance ──▶ payout (KYC/risk gated)
+   |                                        |  release-escrow cron
+   v                                        v
+connected balance <-- retry-transfers  payable balance --> payout (KYC/risk gated)
                       (unfunded legs)
 
-platform ──off_session PaymentIntent (customer + saved PM)──▶ subscription invoice
+platform --off_session PaymentIntent (customer + saved PM)--> subscription invoice
              dunning: 3 attempts, 3 days apart, then suspend
 ```
 
@@ -79,10 +80,10 @@ platform ──off_session PaymentIntent (customer + saved PM)──▶ subscrip
    this at transfer time, not onboarding time, so the templates apply the
    region rule at onboarding.
 4. **Connect events carry a different signing secret** than platform events. Two
-   endpoints, two secrets, one URL — verify against both.
-5. **A connected account's country is immutable** — wrong country means
+   endpoints, two secrets, one URL: verify against both.
+5. **A connected account's country is immutable.** A wrong country means
    re-onboarding, not a patch.
-6. **Money is never a float** — `numeric(19,4)` strings end to end, `bigint` math,
+6. **Money is never a float.** `numeric(19,4)` strings end to end, `bigint` math,
    minor units only at the SDK edge.
 
 ## Hard rules
@@ -108,29 +109,19 @@ platform ──off_session PaymentIntent (customer + saved PM)──▶ subscrip
 
 ## Quick start
 
-1. Model the money — [money.md](references/money.md), [data-model.md](references/data-model.md), [store.md](references/store.md).
-2. Client, dual webhook secrets, env — [stripe-adapter.md](references/stripe-adapter.md).
-3. Onboard accounts; **check the region rule first** — [connect-accounts.md](references/connect-accounts.md).
-4. Receive events idempotently — [webhooks.md](references/webhooks.md).
-5. Settle: claim, fan out, escrow, reserve — [settlement.md](references/settlement.md).
-6. Converge: retry legs, reconcile fees — [reconciliation.md](references/reconciliation.md).
-7. Bill tenants — [subscriptions.md](references/subscriptions.md); run it with [operations.md](references/operations.md).
+1. Model the money: [money.md](references/money.md), [data-model.md](references/data-model.md),
+   [store.md](references/store.md).
+2. Client, dual webhook secrets, env: [stripe-adapter.md](references/stripe-adapter.md).
+3. Onboard accounts; **check the region rule first**: [connect-accounts.md](references/connect-accounts.md).
+4. Receive events idempotently: [webhooks.md](references/webhooks.md).
+5. Settle by claim, fan-out, escrow and reserve: [settlement.md](references/settlement.md).
+6. Converge by retrying legs and reconciling fees: [reconciliation.md](references/reconciliation.md).
+7. Bill tenants: [subscriptions.md](references/subscriptions.md); run it with
+   [operations.md](references/operations.md).
 
-Fit it to your app with [adaptation.md](references/adaptation.md); the record of
-the audit is in [provenance.md](references/provenance.md).
-
-## Adaptation Contract
-
-| Seam | The skill ships | The host supplies |
-|---|---|---|
-| Domain entities | `Tenant` (seller org), `Order`, `VendorOrder`, `Partner` | Its own vocabulary |
-| Tenant scope | One server-derived `tenantId` | org / workspace / seller |
-| Auth guard | An adapter signature per route | Clerk, NextAuth, Supabase, custom |
-| Data access | A [`PaymentsStore`](references/store.md) contract + SQL | Its ORM or SDK |
-| Audit + notifications | Call sites, event names, payload shapes | Its audit table / outbox |
-| Background work | Four crons and their cadence | Its scheduler |
-| Validation | A schema shape per route body | zod / valibot / yup |
-| UI | Nothing — this skill is server-side | All of it |
+Fit it to your app with [adaptation.md](references/adaptation.md), which carries the
+seam contract with the host; the record of the audit is in
+[provenance.md](references/provenance.md).
 
 ## Reference directory
 

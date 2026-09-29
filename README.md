@@ -7,11 +7,10 @@
 [![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-compatible-059669)](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/skills.md)
 
 An [Agent Skill](https://agentskills.io) that teaches an agent to build **Stripe Connect marketplace money
-movement** and **Stripe platform subscription billing** in a **Next.js App Router** app.
-
-Two money flows on one Stripe account. A marketplace charges the buyer once and fans the proceeds out to many
-merchants (Connect, *separate charges and transfers*). A platform subscription charges those merchants a
-recurring fee off-session (Billing). They share a client, a webhook pair and a money type.
+movement** and **Stripe platform subscription billing** in a **Next.js App Router** app: two money flows on
+one Stripe account. A marketplace charges the buyer once and fans the proceeds out to many merchants (Connect,
+*separate charges and transfers*). A platform subscription charges those merchants a recurring fee
+off-session (Billing). They share a client, a webhook pair and a money type.
 
 The insight that shapes the whole skill: **the buyer's charge and the merchants' payouts fail independently.**
 By the time settlement runs the money has already moved, so a rejected transfer must never fail the charge or
@@ -37,9 +36,11 @@ npx skills add timerise-ai/stripe-connect-subscriptions
 Name the agents instead with `-a`, for example
 `npx skills add timerise-ai/stripe-connect-subscriptions -a claude-code -a codex`.
 
-Or clone it yourself. Nothing here is Claude-specific: the skill is a plain [Agent
-Skills](https://agentskills.io) folder, `SKILL.md` plus markdown references with no file that calls a model,
-so cloning it into an agent's skills directory is all an install is. For Claude Code:
+### Manual install
+
+Nothing here is Claude-specific: the skill is a plain [Agent Skills](https://agentskills.io) folder,
+`SKILL.md` plus markdown references with no file that calls a model, so cloning it into an agent's skills
+directory is all an install is. For Claude Code:
 
 ```bash
 git clone https://github.com/timerise-ai/stripe-connect-subscriptions.git ~/.claude/skills/stripe-connect-subscriptions
@@ -75,8 +76,12 @@ the skill stays cheap in context until a topic is actually needed.
 
 | File | Contents |
 |---|---|
-| `SKILL.md` | Entry point: when to use and when not to, six critical facts, five hard rules, the quick start, the Adaptation Contract table, and the reference directory |
-| `references/adaptation.md` | The seam contract with the host app:  fitting it to your app, including which parts to leave behind |
+| `SKILL.md` | Entry point: when to use and when not to, the architecture, six critical facts, five hard rules, the quick start, and the reference directory |
+| `README.md` | This file: the human-facing front door |
+| `CHANGELOG.md` | Every release, newest first |
+| `CLAUDE.md` | What this repository is and its editing conventions, for an agent editing the skill itself |
+| `LICENSE` | MIT |
+| `references/adaptation.md` | The seam contract with the host app: fitting it to your app, including which parts to leave behind |
 | `references/architecture.md` | Why separate charges and transfers, and the ledger it implies |
 | `references/data-model.md` | Schema, columns, RLS |
 | `references/store.md` | The `PaymentsStore` data-access contract and its atomic claims |
@@ -89,6 +94,8 @@ the skill stays cheap in context until a topic is actually needed.
 | `references/subscriptions.md` | Off-session charges, saved cards, dunning, suspension |
 | `references/operations.md` | Env, setup order, crons, observability, troubleshooting |
 | `references/provenance.md` | The audit record: what changed from the earlier implementation, what was kept, and what is unverified |
+| `evals/` | The prompts an operator types after installing (`prompts.md`) and one file per agent eval: the skill installed into an empty Next.js app, one prompt, no help, then type-checked, built and tested |
+| `.github/workflows/agent-eval.yml` | Runs the agent evals on every published release through the index's reusable workflow; the same in every skill |
 
 The skill is server-side only and backend-agnostic behind one `store` object. It needs a **relational** store,
 because the ledger relies on `sum()` over indexed rows, a unique constraint for webhook idempotency, and
@@ -101,14 +108,14 @@ the places most likely to be implemented wrongly, and they are flagged as such.
 
 These travel with the module and are never optional (they are the hard rules in `SKILL.md`):
 
-1. **A failed transfer never fails the settlement.** Record the leg unfunded and continue. The charge has
+1. **Never let a failed transfer fail the settlement.** Record the leg unfunded and continue. The charge has
    already succeeded, so the webhook must succeed too; the retry cron funds the leg later.
-2. **A duplicate webhook insert is not "already handled".** The insert is a *claim*; the retry after a
+2. **Never treat a duplicate webhook insert as "already handled".** The insert is a *claim*; the retry after a
    delivery crashed mid-handling re-runs the handlers, so every event runs to completion exactly once.
 3. **Never re-send a transfer without asking Stripe whether it already exists.** A leg recorded unfunded
    because the *response* was lost pays twice once Stripe's 24h idempotency window passes.
-4. **Settlement exclusivity comes from an atomic leased claim,** never from a status flag written at the end.
-   Two callers reach settlement routinely; the claim is what makes inventory and transfers happen once.
+4. **Never derive settlement exclusivity from a status flag written at the end.** Two callers reach settlement
+   routinely; an atomic leased claim is what makes inventory and transfers happen once.
 5. **Never reverse more than a transfer's remaining headroom.** Stacked reversals, such as a gateway fee and
    then a refund, are rejected past the original amount.
 
@@ -136,16 +143,19 @@ The host supplies the other half of each seam:
 
 ## Contributing
 
-Issues and pull requests are welcome here. Pure markdown, with no build, lint or test step. Claims in this
-skill are meant to be verifiable: if you change a factual claim, say how you verified it, whether against the
-Stripe API, the docs, or a reproduction.
+Issues and pull requests are welcome here. Pure markdown, with no build, lint or test step in this repository.
+Code blocks name their destination on the first line, and every template is written to compile under `strict`
+and `noUncheckedIndexedAccess`, so keep imports complete and types explicit. Claims in this skill are meant
+to be verifiable: if you change a factual claim, say how you verified it, whether against the Stripe API, the
+Stripe docs, or a reproduction.
 
 Adding, removing or renaming a file in `references/` means updating the quick start and the reference
 directory table in `SKILL.md`, the file table above, and any relative cross-links. The odd-looking parts of
 the templates are there for reasons `references/provenance.md` records, and that ledger must stay truthful:
 read it before simplifying anything, and add an entry for anything you change. Commits follow Conventional
 Commits and releases follow [STANDARD.md](https://github.com/timerise-ai/skills/blob/main/STANDARD.md) in the
-index.
+index; `CLAUDE.md` carries the full editing conventions.
+
 ## Part of the Timerise Skills
 
 This is one of the [Timerise Skills](https://github.com/timerise-ai/skills): modules for **Next.js App
